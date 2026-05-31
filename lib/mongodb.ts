@@ -8,6 +8,8 @@ if (!uri) {
 
 const client = new MongoClient(uri);
 
+
+
 export async function connectToDatabase() {
   const clientAny = client as any;
   if (!clientAny.topology?.isConnected?.()) {
