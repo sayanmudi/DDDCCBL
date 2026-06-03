@@ -25,7 +25,7 @@ interface SidebarProps {
 
 export default function Sidebar({ menuItems, userRole }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const sidebarWidth = isCollapsed ? 'w-20' : 'w-72';
+  const sidebarWidth = isCollapsed ? 'w-10' : 'w-50';
 
   return (
     <aside
@@ -40,9 +40,6 @@ export default function Sidebar({ menuItems, userRole }: SidebarProps) {
               href="/dashboard"
               className="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium text-slate-900 transition hover:bg-slate-100"
             >
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-cyan-500/15 text-cyan-700">
-                D
-              </span>
               {!isCollapsed ? <span>Dashboard</span> : null}
             </Link>
           </div>
@@ -59,15 +56,12 @@ export default function Sidebar({ menuItems, userRole }: SidebarProps) {
               >
                 <Link
                   href={`/${menu.slug}`}
-                  className={`flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium transition ${
+                  className={`flex items-center gap-0 rounded-2xl px-3 py-3 text-sm font-medium transition ${
                     menuAccessible
                       ? 'text-slate-900 hover:bg-slate-100'
                       : 'cursor-not-allowed text-slate-400'
                   }`}
                 >
-                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-cyan-500/15 text-cyan-700">
-                    {menu.title.charAt(0)}
-                  </span>
                   {!isCollapsed ? <span>{menu.title}</span> : null}
                 </Link>
 

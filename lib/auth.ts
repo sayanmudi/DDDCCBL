@@ -25,7 +25,6 @@ export const authOptions: NextAuthOptions = {
         return {
           id: user.userId,
           name: user.name,
-          email: `${user.userId}@dddccbl.local`,
           role: user.role,
           image: profileImage
         } as any;

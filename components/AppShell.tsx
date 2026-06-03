@@ -47,18 +47,19 @@ export default function AppShell({ userName, userRole, userImage, title, descrip
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
       <div className="w-full bg-white border-b border-slate-200 shadow-sm shadow-slate-200/50">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-0 py-3">
           <div className="flex items-center gap-0 -ml-6">
             <Image
               src="/photos/dddccb_logo.png"
               width={100}
               height={56}
               alt="DDDCCBL"
-              className="h-full w-[100px] object-contain"
+              priority
+              loading="eager"
+              className="h-auto w-auto object-contain"
             />
             <p className="text-sm font-bold leading-[100px] h-full flex items-center">Dakshin Dinajpur District Central Co-operative Bank Ltd.</p>
           </div>
-
           <div className="flex items-center gap-0 -mr-6">
             <div className="relative" ref={popupRef}>
               <button
