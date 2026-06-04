@@ -31,7 +31,7 @@ export default async function ReportDetailPage({ params }: ReportPageProps) {
         userRole={userRole}
         userImage={userImage}
         title="Reports"
-        description="Report not found"
+        description="Report not found."
         menuItems={menuItems}
       >
         <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-8 shadow-xl shadow-slate-950/20">
