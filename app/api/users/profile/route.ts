@@ -9,12 +9,6 @@ export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
   let userId = (session?.user as any)?.id as string | undefined;
 
-  if (!userId) {
-    const email = (session?.user as any)?.email as string | undefined;
-    if (email?.includes('@')) {
-      userId = email.split('@')[0];
-    }
-  }
 
   if (!session?.user || !userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });

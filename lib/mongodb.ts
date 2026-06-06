@@ -28,7 +28,6 @@ export async function getMenusCollection() {
   const db = await connectToDatabase();
   return db.collection('menus');
 }
-
 export function serializeMenuItems(menuItems: any[]) {
   return menuItems.map((menu) => ({
     ...menu,
@@ -36,3 +35,19 @@ export function serializeMenuItems(menuItems: any[]) {
     subMenus: menu.subMenus?.map((submenu: any) => ({ ...submenu })) ?? undefined
   }));
 }
+
+export async function getFormTemplatesCollection() {
+  const db = await connectToDatabase();
+  return db.collection('form_templates');
+}
+
+export async function getformtemplatesCollection() {
+  return getFormTemplatesCollection();
+}
+
+export async function getFormSubmissionsCollection() {
+  const db = await connectToDatabase();
+  return db.collection('form_submissions');
+}
+
+

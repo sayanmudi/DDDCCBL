@@ -6,7 +6,8 @@ const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'DDDCCBL Employee Dashboard',
-  description: 'Employee dashboard with role-based menus and reports'
+  description: 'Employee dashboard with role-based menus and reports',
+  viewport: 'width=device-width, initial-scale=1, maximum-scale=5'
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

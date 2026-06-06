@@ -72,8 +72,20 @@ async function seed() {
             title: 'Teller Reports',
             slug: 'teller-reports',
             access: ['Admin', 'Manager', 'Teller']
+          },
+          {
+            title: 'Submitted Forms',
+            slug: 'submissions',
+            access: ['Admin', 'Manager', 'Supervisor', 'Teller']
           }
         ]
+      },
+      {
+        title: 'Create / Update Form',
+        slug: 'forms',
+        description: 'Create and assign role-based forms, then review submissions.',
+        access: ['Admin', 'Manager', 'Supervisor', 'Teller'],
+        subMenus: []
       }
     ]);
 

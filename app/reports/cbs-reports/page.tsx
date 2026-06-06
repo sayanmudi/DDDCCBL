@@ -5,7 +5,7 @@ import { authOptions } from '../../../lib/auth';
 import { getMenusCollection, serializeMenuItems } from '../../../lib/mongodb';
 
 const sampleData = [
-  { branch: 'Central', transactions: 1287, deposits: 984500, withdrawals: 622100 },
+  { branch: 'Central', transactions: 8582, deposits: 9856232, withdrawals: 622100 },
   { branch: 'North', transactions: 923, deposits: 742300, withdrawals: 511200 },
   { branch: 'East', transactions: 1150, deposits: 832100, withdrawals: 450800 },
   { branch: 'West', transactions: 776, deposits: 594200, withdrawals: 338900 }
