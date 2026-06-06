@@ -118,7 +118,7 @@ export default function AppShell({ userName, userRole, userImage, title, descrip
                       type="button"
                       onClick={() => {
                         setProfileOpen(false);
-                        signOut({ callbackUrl: '/login' });
+                        signOut({ callbackUrl: process.env.NEXT_PUBLIC_NEXTAUTH_URL ?? '/login' });
                       }}
                       className="block w-full rounded-md bg-slate-100 px-3 py-2 text-center text-sm text-blue-600 hover:bg-slate-200 transition"
                     >
