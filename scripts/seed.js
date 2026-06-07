@@ -33,14 +33,16 @@ async function seed() {
         password: 'Admin@123',
         name: 'Supriyo Chakraborty',
         mobile: '9804290021',
-        role: 'Manager'
+        role: 'Manager',
+        image: '/photos/138_profile.jpg'
       },
       {
         userId: '149',
         password: 'Admin@123',
         name: 'Parthajit Sarkar',
         mobile: '9804290021',
-        role: 'Teller'
+        role: 'Teller',
+        image: '/photos/149_profile.jpg'
       }
     ]);
 
