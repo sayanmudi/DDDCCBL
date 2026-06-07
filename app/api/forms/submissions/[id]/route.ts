@@ -63,11 +63,11 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
 
   if (action === 'approve') {
     updateFields.locked = true;
-    updateFields.approvedBy = session.user.id;
+    updateFields.approvedBy = (session.user as any).id;
     updateFields.approvedAt = new Date();
   } else if (action === 'reject') {
     updateFields.locked = false;
-    updateFields.rejectedBy = session.user.id;
+    updateFields.rejectedBy = (session.user as any).id;
     updateFields.rejectedAt = new Date();
   }
 
