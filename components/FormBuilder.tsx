@@ -56,6 +56,15 @@ export default function FormBuilder() {
     );
   };
 
+  const getFieldsForSave = () =>
+    fields.map((field) => ({
+      ...field,
+      required: Boolean(field.required),
+      options: field.type === "dropdown" || field.type === "checkbox"
+        ? field.options?.map((option) => option.trim()).filter(Boolean) ?? []
+        : [],
+    }));
+
   const submitForm = async () => {
     try {
 
@@ -73,7 +82,7 @@ export default function FormBuilder() {
             body: JSON.stringify({
               formName,
               description,
-              fields,
+              fields: getFieldsForSave(),
             }),
           }
         );
@@ -191,6 +200,10 @@ export default function FormBuilder() {
               <option value="dropdown">
                 Dropdown
               </option>
+
+              <option value="checkbox">
+                Checkbox
+              </option>
             </select>
 
             <label>
@@ -210,8 +223,8 @@ export default function FormBuilder() {
               Required
             </label>
 
-            {field.type ===
-              "dropdown" && (
+            {(field.type === "dropdown" ||
+              field.type === "checkbox") && (
               <textarea
                 className="border p-2 w-full mt-2"
                 placeholder="Option1,Option2,Option3"

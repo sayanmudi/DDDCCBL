@@ -97,6 +97,32 @@ export async function GET(request: NextRequest) {
   });
 }
 
+const cleanOptions = (options: unknown) =>
+  Array.isArray(options) ? options.map((option) => String(option).trim()).filter(Boolean) : [];
+
+const getSelectedCheckboxOptions = (value: unknown) =>
+  String(value ?? '').split(',').map((option) => option.trim()).filter(Boolean);
+
+const isRequiredField = (field: any) => field.required === true || field.required === 'true';
+
+const getMissingRequiredFields = (fields: any[], data: Record<string, unknown>) =>
+  fields
+    .map((field, index) => ({ field, index }))
+    .filter(({ field }) => {
+      if (!isRequiredField(field)) return false;
+      const label = String(field.label ?? '');
+      const value = data[label];
+
+      if (field.type === 'checkbox') {
+        return cleanOptions(field.options).length
+          ? getSelectedCheckboxOptions(value).length === 0
+          : value !== true && value !== 'true';
+      }
+
+      return !String(value ?? '').trim();
+    })
+    .map(({ field, index }) => String(field.label ?? '').trim() || `Field ${index + 1}`);
+
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user) {
@@ -128,6 +154,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'This form is not assigned to Teller users.' }, { status: 403 });
   }
 
+  const submissionData =
+    body.data && typeof body.data === 'object' && !Array.isArray(body.data) ? body.data : {};
+  const missingRequiredFields = getMissingRequiredFields(
+    Array.isArray(template.fields) ? template.fields : [],
+    submissionData
+  );
+
+  if (missingRequiredFields.length) {
+    return NextResponse.json(
+      { error: `Please fill required field${missingRequiredFields.length > 1 ? 's' : ''}: ${missingRequiredFields.join(', ')}.` },
+      { status: 400 }
+    );
+  }
+
   const submissionsCollection = await getFormSubmissionsCollection();
   const existing = await submissionsCollection.findOne({ templateId, submittedById: userId, status: { $in: ['Pending', 'Rejected'] } });
   const now = new Date();
@@ -143,7 +183,7 @@ export async function POST(request: NextRequest) {
       { _id: existingId },
       {
         $set: {
-          data: body.data || {},
+          data: submissionData,
           status: 'Pending',
           locked: true,
           reviewer_comment: '',
@@ -188,7 +228,7 @@ export async function POST(request: NextRequest) {
     templateName: template.formName,
     submittedBy: userName,
     submittedById: userId,
-    data: body.data || {},
+    data: submissionData,
     status: 'Pending',
     locked: true,
     reviewer_comment: '',
@@ -208,7 +248,7 @@ export async function POST(request: NextRequest) {
       templateName: template.formName,
       submittedBy: userName,
       submittedById: userId,
-      data: body.data || {},
+      data: submissionData,
       status: 'Pending',
       locked: true,
       reviewer_comment: '',

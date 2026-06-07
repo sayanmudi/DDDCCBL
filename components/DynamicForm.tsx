@@ -38,6 +38,39 @@ DynamicForm({
          name={field.label}
         />
        );
+
+      case "checkbox": {
+       const options = Array.isArray(field.options)
+        ? field.options
+          .map((option:any) => String(option).trim())
+          .filter(Boolean)
+        : [];
+
+       if(options.length){
+        return(
+         <div key={index}>
+          {options.map((option:string) => (
+           <label key={option}>
+            <input
+             type="checkbox"
+             name={field.label}
+             value={option}
+            />
+            {option}
+           </label>
+          ))}
+         </div>
+        );
+       }
+
+       return(
+        <input
+         key={index}
+         type="checkbox"
+         name={field.label}
+        />
+       );
+      }
      }
     }
    )}

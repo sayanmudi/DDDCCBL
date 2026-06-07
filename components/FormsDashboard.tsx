@@ -44,7 +44,16 @@ interface FormsDashboardProps {
 }
 
 const roleOptions = ['Admin', 'Manager', 'Supervisor', 'Teller'];
-const fieldTypes = ['text', 'number', 'date', 'textarea', 'dropdown'];
+const fieldTypes = ['text', 'number', 'date', 'textarea', 'dropdown', 'checkbox'];
+const optionFieldTypes = ['dropdown', 'checkbox'];
+const cleanOptions = (options?: string[]) => options?.map((option) => String(option).trim()).filter(Boolean) ?? [];
+const isRequiredValue = (value: unknown) => value === true || value === 'true';
+const normalizeFormField = (field: any): FormField => ({
+  label: typeof field?.label === 'string' ? field.label : '',
+  type: fieldTypes.includes(field?.type) ? field.type : 'text',
+  required: isRequiredValue(field?.required),
+  options: Array.isArray(field?.options) ? field.options.map((option: unknown) => String(option)) : [],
+});
 
 const emptyTemplate: FormTemplate = {
   formName: '',
@@ -104,7 +113,8 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
       if (template) {
         const newValues: Record<string, string> = {};
         template.fields.forEach((field) => {
-          newValues[field.label] = newValues[field.label] ?? '';
+          const hasCheckboxOptions = field.type === 'checkbox' && field.options?.length;
+          newValues[field.label] = field.type === 'checkbox' && !hasCheckboxOptions ? 'false' : '';
         });
         const existing = mySubmissions.find((submission) => submission.templateId === activeTemplateId && submission.status !== 'Approved');
         if (existing) {
@@ -123,6 +133,7 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
       setTemplates(
         (payload.templates || []).map((template: any) => ({
           ...template,
+          fields: Array.isArray(template.fields) ? template.fields.map(normalizeFormField) : [],
           assignedRoles: Array.isArray(template.assignedRoles) ? template.assignedRoles : [],
           approvalRoles: Array.isArray(template.approvalRoles) ? template.approvalRoles : [],
         }))
@@ -199,6 +210,17 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
     });
   };
 
+  const getTemplateForSave = () => ({
+    ...selectedTemplate,
+    fields: selectedTemplate.fields.map((field) => ({
+      ...field,
+      required: isRequiredValue(field.required),
+      options: optionFieldTypes.includes(field.type)
+        ? cleanOptions(field.options)
+        : [],
+    })),
+  });
+
   const saveTemplate = async () => {
     clearStatus();
     if (!selectedTemplate.formName.trim()) {
@@ -221,7 +243,7 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
     const response = await fetch('/api/forms/templates', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(selectedTemplate),
+      body: JSON.stringify(getTemplateForSave()),
     });
     const payload = await response.json();
     setIsSaving(false);
@@ -264,6 +286,46 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
     setFormData((current) => ({ ...current, [label]: value }));
   };
 
+  const getFieldOptions = (field: FormField) => cleanOptions(field.options);
+
+  const getSelectedCheckboxOptions = (value: string | undefined) =>
+    value?.split(',').map((option) => option.trim()).filter(Boolean) ?? [];
+
+  const handleCheckboxValueChange = (label: string, checked: boolean) => {
+    handleFieldValueChange(label, checked ? 'true' : 'false');
+  };
+
+  const handleCheckboxOptionChange = (label: string, option: string, checked: boolean) => {
+    setFormData((current) => {
+      const selectedOptions = new Set(getSelectedCheckboxOptions(current[label]));
+      if (checked) {
+        selectedOptions.add(option);
+      } else {
+        selectedOptions.delete(option);
+      }
+      return { ...current, [label]: Array.from(selectedOptions).join(', ') };
+    });
+  };
+
+  const isCheckboxChecked = (value: string | undefined) => value === 'true';
+
+  const isCheckboxOptionChecked = (value: string | undefined, option: string) =>
+    getSelectedCheckboxOptions(value).includes(option);
+
+  const getMissingRequiredFields = (template: FormTemplate, data: Record<string, string>) =>
+    template.fields
+      .filter((field) => {
+        if (!isRequiredValue(field.required)) return false;
+        const value = data[field.label];
+        if (field.type === 'checkbox') {
+          return getFieldOptions(field).length
+            ? getSelectedCheckboxOptions(value).length === 0
+            : !isCheckboxChecked(value);
+        }
+        return !String(value ?? '').trim();
+      })
+      .map((field, index) => field.label || `Field ${index + 1}`);
+
   const submitAssignedForm = async () => {
     if (!activeTemplateId) {
       setStatusMessage('Select a form to fill first.');
@@ -272,6 +334,11 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
     const template = templates.find((item) => item._id === activeTemplateId);
     if (!template) {
       setStatusMessage('Template not found.');
+      return;
+    }
+    const missingRequiredFields = getMissingRequiredFields(template, formData);
+    if (missingRequiredFields.length) {
+      setStatusMessage(`Please fill required field${missingRequiredFields.length > 1 ? 's' : ''}: ${missingRequiredFields.join(', ')}.`);
       return;
     }
     const response = await fetch('/api/forms/submissions', {
@@ -414,7 +481,7 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
                           <select
                             className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-3 py-2.5 sm:py-2 text-sm"
                             value={field.type}
-                            onChange={(e) => setTemplateField(index, { type: e.target.value, options: e.target.value === 'dropdown' ? field.options ?? [] : field.options })}
+                            onChange={(e) => setTemplateField(index, { type: e.target.value, options: optionFieldTypes.includes(e.target.value) ? field.options ?? [] : [] })}
                           >
                             {fieldTypes.map((type) => (
                               <option key={type} value={type}>{type}</option>
@@ -432,7 +499,7 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
                           />
                           Required
                         </label>
-                        {field.type === 'dropdown' ? (
+                        {optionFieldTypes.includes(field.type) ? (
                           <div>
                             <label className="mb-2 block text-sm font-medium text-slate-700">Options (comma separated)</label>
                             <input
@@ -621,6 +688,28 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
                               placeholder="Preview"
                               className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-500"
                             />
+                          ) : field.type === 'checkbox' ? (
+                            getFieldOptions(field).length ? (
+                              <div className="mt-3 space-y-2">
+                                {getFieldOptions(field).map((option) => (
+                                  <label key={option} className="flex items-center gap-2 text-sm text-slate-600">
+                                    <input
+                                      type="checkbox"
+                                      disabled
+                                      className="h-4 w-4 rounded border-slate-300 text-cyan-600"
+                                    />
+                                    {option}
+                                  </label>
+                                ))}
+                              </div>
+                            ) : (
+                              <input
+                                type="checkbox"
+                                disabled
+                                aria-label={`${field.label} preview`}
+                                className="mt-3 h-4 w-4 rounded border-slate-300 text-cyan-600"
+                              />
+                            )
                           ) : field.type === 'dropdown' ? (
                             <select
                               disabled
@@ -738,6 +827,29 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
                                 onChange={(e) => handleFieldValueChange(field.label, e.target.value)}
                                 className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm"
                               />
+                            ) : field.type === 'checkbox' ? (
+                              getFieldOptions(field).length ? (
+                                <div className="space-y-2">
+                                  {getFieldOptions(field).map((option) => (
+                                    <label key={option} className="flex items-center gap-2 text-sm text-slate-700">
+                                      <input
+                                        type="checkbox"
+                                        checked={isCheckboxOptionChecked(value, option)}
+                                        onChange={(e) => handleCheckboxOptionChange(field.label, option, e.target.checked)}
+                                        className="h-4 w-4 rounded border-slate-300 text-cyan-600 cursor-pointer"
+                                      />
+                                      {option}
+                                    </label>
+                                  ))}
+                                </div>
+                              ) : (
+                                <input
+                                  type="checkbox"
+                                  checked={isCheckboxChecked(value)}
+                                  onChange={(e) => handleCheckboxValueChange(field.label, e.target.checked)}
+                                  className="h-4 w-4 rounded border-slate-300 text-cyan-600 cursor-pointer"
+                                />
+                              )
                             ) : field.type === 'dropdown' ? (
                               <select
                                 value={value}
@@ -790,6 +902,31 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
                             onChange={(e) => handleFieldValueChange(field.label, e.target.value)}
                             className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm"
                           />
+                        ) : field.type === 'checkbox' ? (
+                          getFieldOptions(field).length ? (
+                            <div className="space-y-2">
+                              {getFieldOptions(field).map((option) => (
+                                <label key={option} className="flex items-center gap-2 text-sm text-slate-700">
+                                  <input
+                                    type="checkbox"
+                                    checked={isCheckboxOptionChecked(value, option)}
+                                    disabled={readOnly}
+                                    onChange={(e) => handleCheckboxOptionChange(field.label, option, e.target.checked)}
+                                    className="h-4 w-4 rounded border-slate-300 text-cyan-600 cursor-pointer disabled:cursor-not-allowed"
+                                  />
+                                  {option}
+                                </label>
+                              ))}
+                            </div>
+                          ) : (
+                            <input
+                              type="checkbox"
+                              checked={isCheckboxChecked(value)}
+                              disabled={readOnly}
+                              onChange={(e) => handleCheckboxValueChange(field.label, e.target.checked)}
+                              className="h-4 w-4 rounded border-slate-300 text-cyan-600 cursor-pointer disabled:cursor-not-allowed"
+                            />
+                          )
                         ) : field.type === 'dropdown' ? (
                           <select
                             value={value}
