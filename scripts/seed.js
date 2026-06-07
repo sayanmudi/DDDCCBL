@@ -42,7 +42,13 @@ async function seed() {
         name: 'Parthajit Sarkar',
         mobile: '9804290021',
         role: 'Teller',
-        image: '/photos/149_profile.jpg'
+      },
+      {
+        userId: '201',
+        password: '0',
+        name: 'NOKSHA SKUS LTD',
+        mobile: '9804290021',
+        role: 'PACS',
       }
     ]);
 

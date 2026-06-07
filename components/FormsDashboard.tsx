@@ -43,7 +43,7 @@ interface FormsDashboardProps {
   userName: string;
 }
 
-const roleOptions = ['Admin', 'Manager', 'Supervisor', 'Teller'];
+const roleOptions = ['Admin', 'Manager', 'Supervisor', 'Teller','PACS'];
 const fieldTypes = ['text', 'number', 'date', 'textarea', 'dropdown', 'checkbox'];
 const optionFieldTypes = ['dropdown', 'checkbox'];
 const cleanOptions = (options?: string[]) => options?.map((option) => String(option).trim()).filter(Boolean) ?? [];
