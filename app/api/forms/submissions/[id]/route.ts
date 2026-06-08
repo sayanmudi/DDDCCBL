@@ -13,7 +13,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
   }
 
   const userRole = (session.user as any).role as string;
-  if (userRole !== 'Manager' && userRole !== 'Admin') {
+  if (userRole !== 'Manager' && userRole !== 'Admin' && userRole !== 'Supervisor') {
     return NextResponse.json({ error: 'Only Manager or Admin users can review submissions.' }, { status: 403 });
   }
 
