@@ -143,7 +143,7 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
 
   const loadSubmissions = async () => {
     const params = new URLSearchParams();
-    if (userRole === 'PACS' && userId) {
+    if ((userRole === 'Teller' ||userRole === 'PACS') && userId) {
       params.set('submittedById', userId);
     }
     if (userRole === 'Manager') {
