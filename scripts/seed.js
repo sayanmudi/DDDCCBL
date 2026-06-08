@@ -22,7 +22,7 @@ async function seed() {
     await users.insertMany([
       {
         userId: '134',
-        password: 'Admin@123',
+        password: '0',
         name: 'Sayan Mudi',
         mobile: '9804290021',
         role: 'Admin',
@@ -30,18 +30,27 @@ async function seed() {
       },
       {
         userId: '138',
-        password: 'Admin@123',
+        password: '0',
         name: 'Supriyo Chakraborty',
         mobile: '9804290021',
         role: 'Manager',
-        image: '/photos/138_profile.jpg'
+        image: '/photos/134_profile.jpg'
       },
       {
+        userId: '147',
+        password: '0',
+        name: 'Shubhranil Saha',
+        mobile: '9804290021',
+        role: 'Supervisor',
+        image: '/photos/134_profile.jpg'
+      },      
+      {
         userId: '149',
-        password: 'Admin@123',
+        password: '0',
         name: 'Parthajit Sarkar',
         mobile: '9804290021',
         role: 'Teller',
+        image: '/photos/134_profile.jpg'
       },
       {
         userId: '201',
@@ -49,6 +58,7 @@ async function seed() {
         name: 'NOKSHA SKUS LTD',
         mobile: '9804290021',
         role: 'PACS',
+        image: '/photos/134_profile.jpg'
       }
     ]);
 
@@ -92,7 +102,7 @@ async function seed() {
         title: 'Create / Update Form',
         slug: 'forms',
         description: 'Create and assign role-based forms, then review submissions.',
-        access: ['Admin', 'Manager', 'Supervisor', 'Teller'],
+        access: ['Admin', 'Manager', 'Supervisor', 'Teller', 'PACS'],
         subMenus: []
       }
     ]);

@@ -134,8 +134,8 @@ export async function POST(request: NextRequest) {
   const userRole = (session.user as any).role as string;
   const userName = session.user.name ?? 'Teller';
 
-  if (userRole !== 'Teller') {
-    return NextResponse.json({ error: 'Only Teller users can submit assigned forms.' }, { status: 403 });
+  if (userRole !== 'Teller' && userRole !== 'PACS') {
+    return NextResponse.json({ error: 'Only Teller/PACS users can submit assigned forms.' }, { status: 403 });
   }
 
   const templateId = body.templateId;

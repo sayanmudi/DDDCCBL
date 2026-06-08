@@ -348,7 +348,7 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
     });
     const payload = await response.json();
     if (payload.success) {
-      setStatusMessage('Form submitted to manager for review.');
+      setStatusMessage('Form submitted to reviewer for review.');
       loadSubmissions();
       loadApprovedSubmissions();
     } else {
