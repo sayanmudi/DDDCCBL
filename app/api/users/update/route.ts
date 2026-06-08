@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (resetPassword) {
-    updateFields.password = 'Admin@123';
+    updateFields.password = '0';
   }
 
   const result = await users.findOneAndUpdate(
