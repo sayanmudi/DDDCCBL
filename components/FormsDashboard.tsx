@@ -971,7 +971,7 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
         </section>
       ) : null}
 
-      {userRole === 'Manager' ? (
+      {(userRole === 'Manager' || userRole === 'Supervisor') ? (
         <section className="rounded-3xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm">
           <h2 className="text-lg sm:text-xl font-semibold">Pending Review</h2>
           {reviewableSubmissions.length ? (
