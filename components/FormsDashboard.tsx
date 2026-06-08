@@ -59,7 +59,7 @@ const emptyTemplate: FormTemplate = {
   formName: '',
   description: '',
   fields: [],
-  assignedRoles: ['Teller'],
+  assignedRoles: ['PACS'],
   approvalRoles: [],
 };
 
