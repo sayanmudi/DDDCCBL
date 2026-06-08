@@ -1,13 +1,15 @@
 export function getRoleAccess(role: string) {
   switch (role) {
     case 'Admin':
-      return ['Admin', 'Manager', 'Teller'];
+      return ['Admin', 'Manager', 'Supervisor','Teller', 'PACS'];
     case 'Manager':
-      return ['Manager', 'Teller'];
+      return ['Manager', 'Supervisor','Teller', 'PACS'];
     case 'Supervisor':
-      return ['Supervisor', 'Manager', 'Teller'];
+      return ['Supervisor','Teller', 'PACS'];
     case 'Teller':
-      return ['Teller'];
+      return ['Teller', 'PACS'];
+    case 'PACS':
+      return ['PACS'];
     default:
       return [role];
   }
