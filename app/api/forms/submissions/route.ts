@@ -150,8 +150,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Form template not found.' }, { status: 404 });
   }
 
-  if (!Array.isArray(template.assignedRoles) || !template.assignedRoles.includes('Teller')) {
-    return NextResponse.json({ error: 'This form is not assigned to Teller users.' }, { status: 403 });
+  if (!Array.isArray(template.assignedRoles) || (!template.assignedRoles.includes('Teller') && !template.assignedRoles.includes('PACS'))) {
+    return NextResponse.json({ error: 'This form is not assigned to Teller or PACS users.' }, { status: 403 });
   }
 
   const submissionData =
