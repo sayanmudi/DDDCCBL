@@ -60,7 +60,7 @@ const emptyTemplate: FormTemplate = {
   description: '',
   fields: [],
   assignedRoles: ['PACS'],
-  approvalRoles: [],
+  approvalRoles: ['Supervisor'],
 };
 
 export default function FormsDashboard({ userRole, userId, userName }: FormsDashboardProps) {
