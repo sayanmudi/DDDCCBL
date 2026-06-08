@@ -14,7 +14,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
 
   const userRole = (session.user as any).role as string;
   if (userRole !== 'Manager' && userRole !== 'Admin' && userRole !== 'Supervisor') {
-    return NextResponse.json({ error: 'Only Manager or Admin users can review submissions.' }, { status: 403 });
+    return NextResponse.json({ error: 'Only Manager ,Supervisor or Admin users can review submissions.' }, { status: 403 });
   }
 
   const body = await request.json();
