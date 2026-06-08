@@ -739,7 +739,7 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
         </div>
       ) : null}
 
-      {userRole === 'Teller' ? (
+      {(userRole === 'Teller' || userRole === 'PACS') ? (
         <section className="rounded-3xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm">
           <h2 className="text-lg sm:text-xl font-semibold">Assigned Forms</h2>
           {assignedTemplates.length ? (
