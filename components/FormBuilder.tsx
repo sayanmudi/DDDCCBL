@@ -227,13 +227,13 @@ export default function FormBuilder() {
               field.type === "checkbox") && (
               <textarea
                 className="border p-2 w-full mt-2"
-                placeholder="Option1,Option2,Option3"
+                placeholder="Option1;Option2;Option3"
                 onChange={(e) =>
                   updateField(
                     index,
                     "options",
                     e.target.value
-                      .split(",")
+                      .split(";")
                       .map((x) =>
                         x.trim()
                       )

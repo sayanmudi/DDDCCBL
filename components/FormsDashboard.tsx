@@ -501,11 +501,11 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
                         </label>
                         {optionFieldTypes.includes(field.type) ? (
                           <div>
-                            <label className="mb-2 block text-sm font-medium text-slate-700">Options (comma separated)</label>
+                            <label className="mb-2 block text-sm font-medium text-slate-700">Options (semicolon separated)</label>
                             <input
                               className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-3 py-2.5 sm:py-2 text-sm"
-                              value={field.options?.join(',') ?? ''}
-                              onChange={(e) => setTemplateField(index, { options: e.target.value.split(',').map((value) => value.trim()) })}
+                              value={field.options?.join(';') ?? ''}
+                              onChange={(e) => setTemplateField(index, { options: e.target.value.split(';').map((value) => value.trim()) })}
                             />
                           </div>
                         ) : null}
