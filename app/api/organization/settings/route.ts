@@ -26,12 +26,13 @@ export async function GET() {
         createdAt: new Date(),
         updatedAt: new Date()
       };
-      await settingsCollection.insertOne(newSettings);
-      settings = newSettings;
+      const result = await settingsCollection.insertOne(newSettings);
+      // Fetch the newly created document
+      settings = await settingsCollection.findOne({ settingId: 'global' });
     }
 
     return NextResponse.json({
-      sessionTimeoutMinutes: settings.sessionTimeoutMinutes || 15
+      sessionTimeoutMinutes: settings?.sessionTimeoutMinutes || 15
     });
   } catch (error) {
     console.error('Error fetching organization settings:', error);
