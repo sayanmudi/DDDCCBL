@@ -7,7 +7,27 @@ import { ObjectId } from 'mongodb';
 
 export async function GET(request: NextRequest) {
   const templatesCollection = await getFormTemplatesCollection();
-  const templates = await templatesCollection.find({}).toArray();
+  const allTemplates = await templatesCollection.find({}).toArray();
+  
+  // Filter out templates that have passed their due date (for Teller/PACS users)
+  const session = await getServerSession(authOptions);
+  const userRole = (session?.user as any)?.role;
+  const now = new Date();
+  
+  let templates = allTemplates;
+  
+  // Only filter for non-admin users
+  if (userRole === 'Teller' || userRole === 'PACS') {
+    templates = allTemplates.filter((template) => {
+      // If no due date, show the template
+      if (!template.dueDate) return true;
+      
+      // If has due date, only show if not expired
+      const dueDate = new Date(template.dueDate);
+      return now <= dueDate;
+    });
+  }
+  
   return NextResponse.json({
     success: true,
     templates: templates.map((template) => ({

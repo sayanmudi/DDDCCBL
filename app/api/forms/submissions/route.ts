@@ -142,6 +142,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Form template not found.' }, { status: 404 });
   }
 
+  // Check if form has passed due date
+  const currentTime = new Date();
+  const dueDate = template.dueDate ? new Date(template.dueDate) : null;
+  
+  if (dueDate && currentTime > dueDate) {
+    return NextResponse.json({
+      error: 'This form has passed its due date and is no longer accepting submissions.'
+    }, { status: 403 });
+  }
+
   if (!Array.isArray(template.assignedRoles) || (!template.assignedRoles.includes('Teller') && !template.assignedRoles.includes('PACS'))) {
     return NextResponse.json({ error: 'This form is not assigned to Teller or PACS users.' }, { status: 403 });
   }

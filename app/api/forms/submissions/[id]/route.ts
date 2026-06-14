@@ -29,6 +29,44 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
 
   const body = await request.json();
   const action = body.action;
+  
+  // Handle unlock action for Manager
+  if (action === 'unlock') {
+    if (userRole !== 'Manager' && userRole !== 'Admin') {
+      return NextResponse.json({ error: 'Only Manager or Admin can unlock submissions.' }, { status: 403 });
+    }
+    
+    const submissionsCollection = await getFormSubmissionsCollection();
+    let submissionId: ObjectId;
+    try {
+      submissionId = new ObjectId(params.id);
+    } catch (err) {
+      return NextResponse.json({ error: 'Invalid submission ID.' }, { status: 400 });
+    }
+
+    const result = await submissionsCollection.findOneAndUpdate(
+      { _id: submissionId },
+      {
+        $set: {
+          isUnlocked: true,
+          unlockedBy: reviewerId,
+          unlockedAt: new Date()
+        }
+      },
+      { returnDocument: 'after' }
+    );
+
+    if (!result?.value) {
+      return NextResponse.json({ error: 'Failed to unlock submission.' }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Submission unlocked successfully.',
+      submission: result.value,
+    });
+  }
+  
   if (action !== 'approve' && action !== 'reject') {
     return NextResponse.json({ error: 'Invalid action.' }, { status: 400 });
   }
@@ -60,9 +98,49 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     return NextResponse.json({ error: 'Form template not found for submission.' }, { status: 404 });
   }
 
+  // Check if form has passed due date
+  const now = new Date();
+  const dueDate = formTemplate.dueDate ? new Date(formTemplate.dueDate) : null;
+  const isPostDueDate = dueDate && now > dueDate;
+  
+  // Check if submission is unlocked (for post-due-date scenarios)
+  const isUnlocked = submission.isUnlocked === true;
+
+  // Supervisor cannot approve/reject post due date unless unlocked by Manager
+  if (isPostDueDate && userRole === 'Supervisor' && !isUnlocked) {
+    return NextResponse.json({
+      error: 'This submission is past the due date. Please request a Manager to unlock it for review.'
+    }, { status: 403 });
+  }
+
   const approvalRoles = Array.isArray(formTemplate.approvalRoles) ? formTemplate.approvalRoles : [];
   if (userRole !== 'Admin' && approvalRoles.length > 0 && !approvalRoles.includes(userRole)) {
     return NextResponse.json({ error: 'You are not authorized to approve or reject this submission.' }, { status: 403 });
+  }
+
+  // Handle two-stage approval
+  const requiresTwoStageApproval = formTemplate.requiresTwoStageApproval === true;
+  const secondApprovalRole = formTemplate.secondApprovalRole;
+  
+  if (requiresTwoStageApproval && secondApprovalRole) {
+    // Check if this is first or second stage approval
+    const hasFirstApproval = submission.firstApprovedBy && submission.firstApprovedAt;
+    
+    if (!hasFirstApproval) {
+      // First stage approval - must be from primary approval role
+      if (userRole === secondApprovalRole) {
+        return NextResponse.json({
+          error: 'This submission requires first approval before second approval.'
+        }, { status: 403 });
+      }
+    } else {
+      // Second stage approval - must be from second approval role
+      if (userRole !== secondApprovalRole && userRole !== 'Admin') {
+        return NextResponse.json({
+          error: `This submission requires approval from ${secondApprovalRole} as second approver.`
+        }, { status: 403 });
+      }
+    }
   }
 
   const submissionBranchCode = await resolveSubmissionBranchCode(submission);
@@ -74,26 +152,59 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
   }
 
   const updateFields: any = {
-    status: action === 'approve' ? 'Approved' : 'Rejected',
     updatedAt: new Date(),
     reviewer_comment: action === 'reject' ? body.comment || 'Needs correction' : body.comment || '',
   };
 
+  // Use the requiresTwoStageApproval variable already declared above
+  const hasFirstApproval = submission.firstApprovedBy && submission.firstApprovedAt;
+
   if (action === 'approve') {
-    updateFields.locked = true;
-    updateFields.approvedBy = (session.user as any).id;
-    updateFields.approvedAt = new Date();
+    if (requiresTwoStageApproval && !hasFirstApproval) {
+      // First stage approval
+      updateFields.status = 'Pending'; // Keep as pending for second approval
+      updateFields.locked = true;
+      updateFields.firstApprovedBy = (session.user as any).id;
+      updateFields.firstApprovedAt = new Date();
+      updateFields.firstApproverRole = userRole;
+    } else {
+      // Final approval (either single stage or second stage)
+      updateFields.status = 'Approved';
+      updateFields.locked = true;
+      
+      if (requiresTwoStageApproval) {
+        // Second stage approval
+        updateFields.secondApprovedBy = (session.user as any).id;
+        updateFields.secondApprovedAt = new Date();
+        updateFields.secondApproverRole = userRole;
+      } else {
+        // Single stage approval
+        updateFields.approvedBy = (session.user as any).id;
+        updateFields.approvedAt = new Date();
+      }
+    }
   } else if (action === 'reject') {
+    updateFields.status = 'Rejected';
     updateFields.locked = false;
     updateFields.rejectedBy = (session.user as any).id;
     updateFields.rejectedAt = new Date();
   }
 
   const updateDocument: any = { $set: updateFields };
-  if (action === 'approve') {
+  
+  if (action === 'approve' && !requiresTwoStageApproval) {
     updateDocument.$unset = { rejectedBy: '', rejectedAt: '' };
   } else if (action === 'reject') {
-    updateDocument.$unset = { approvedBy: '', approvedAt: '' };
+    updateDocument.$unset = {
+      approvedBy: '',
+      approvedAt: '',
+      firstApprovedBy: '',
+      firstApprovedAt: '',
+      firstApproverRole: '',
+      secondApprovedBy: '',
+      secondApprovedAt: '',
+      secondApproverRole: ''
+    };
   }
 
   let updated;

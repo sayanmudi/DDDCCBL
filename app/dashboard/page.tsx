@@ -5,6 +5,7 @@ import { authOptions } from '../../lib/auth';
 import { getMenusCollection, serializeMenuItems } from '../../lib/mongodb';
 import { getAccessibleSubMenus, hasAccess } from '../../lib/permissions';
 import { normalizeBranchCode } from '../../lib/branchAccess';
+import { getOrganizationSettings } from '../../lib/organizationSettings';
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
@@ -18,6 +19,7 @@ export default async function DashboardPage() {
   const userBranchCode = normalizeBranchCode((session.user as any).branch_code);
   const menus = await getMenusCollection();
   const menuItems = serializeMenuItems((await menus.find({}).toArray()) as any[]);
+  const { organizationName, logoPath } = await getOrganizationSettings();
 
   const accessibleMenus = menuItems.filter((menu) => hasAccess(userRole, menu.access));
 
@@ -30,6 +32,8 @@ export default async function DashboardPage() {
       title="Dashboard"
       description="Role-based access to menus and reports."
       menuItems={menuItems}
+      organizationName={organizationName}
+      logoPath={logoPath}
     >
       <section className="grid gap-4 lg:grid-cols-2">
         {accessibleMenus.map((menu) => (

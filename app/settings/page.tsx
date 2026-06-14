@@ -6,6 +6,7 @@ import OrganizationSettings from '../../components/OrganizationSettings';
 import { authOptions } from '../../lib/auth';
 import { getMenusCollection, getUsersCollection, serializeMenuItems } from '../../lib/mongodb';
 import { normalizeBranchCode } from '../../lib/branchAccess';
+import { getOrganizationSettings } from '../../lib/organizationSettings';
 
 export default async function SettingsPage() {
   const session = await getServerSession(authOptions);
@@ -21,6 +22,7 @@ export default async function SettingsPage() {
 
   const menus = await getMenusCollection();
   const menuItems = serializeMenuItems((await menus.find({}).toArray()) as any[]);
+  const { organizationName, logoPath } = await getOrganizationSettings();
 
   const users = await getUsersCollection();
   const currentUser = await users.findOne({ userId });
@@ -38,6 +40,8 @@ export default async function SettingsPage() {
       title="Settings"
       description="Application preferences, roles, and menu configuration."
       menuItems={menuItems}
+      organizationName={organizationName}
+      logoPath={logoPath}
     >
       <div className="space-y-6">
         <SettingsPanel userId={userId} currentMobile={currentMobile} currentImage={currentImage} />

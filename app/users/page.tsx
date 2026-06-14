@@ -5,6 +5,7 @@ import UserManagementTable from '../../components/UserManagementTable';
 import { authOptions } from '../../lib/auth';
 import { getUserBranchCode, normalizeBranchCode } from '../../lib/branchAccess';
 import { getMenusCollection, getUsersCollection, serializeMenuItems } from '../../lib/mongodb';
+import { getOrganizationSettings } from '../../lib/organizationSettings';
 
 type PageUserRow = {
   userId: string;
@@ -31,6 +32,7 @@ export default async function UsersPage() {
 
   const menus = await getMenusCollection();
   const menuItems = serializeMenuItems((await menus.find({}).toArray()) as Record<string, unknown>[]);
+  const { organizationName, logoPath } = await getOrganizationSettings();
   const usersCollection = await getUsersCollection();
 
   let userFilter: Record<string, unknown> = {};
@@ -57,6 +59,8 @@ export default async function UsersPage() {
       userName={userName}
       userRole={userRole}
       userBranchCode={viewerBranchCode}
+      organizationName={organizationName}
+      logoPath={logoPath}
       userImage={userImage}
       title="Users"
       description={

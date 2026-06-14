@@ -5,6 +5,7 @@ import FormsDashboard from '../../components/FormsDashboard';
 import { authOptions } from '../../lib/auth';
 import { getMenusCollection, serializeMenuItems } from '../../lib/mongodb';
 import { normalizeBranchCode } from '../../lib/branchAccess';
+import { getOrganizationSettings } from '../../lib/organizationSettings';
 
 export default async function FormsPage() {
   const session = await getServerSession(authOptions);
@@ -20,9 +21,12 @@ export default async function FormsPage() {
   const userBranchCode = normalizeBranchCode(branchCode);
   const menus = await getMenusCollection();
   const menuItems = serializeMenuItems((await menus.find({}).toArray()) as any[]);
+  const { organizationName, logoPath } = await getOrganizationSettings();
 
   return (
     <AppShell
+      organizationName={organizationName}
+      logoPath={logoPath}
       userName={userName}
       userRole={userRole}
       userBranchCode={userBranchCode}

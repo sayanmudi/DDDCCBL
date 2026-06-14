@@ -28,6 +28,10 @@ interface FormTemplate {
   assignedRoles: string[];
   approvalRoles: string[];
   status?: string;
+  submissionType?: 'one-time' | 'recurring';
+  frequency?: 'daily' | 'weekly' | 'fortnightly' | 'monthly';
+  dueDate?: string;
+  secondApprovalRole?: string;
 }
 
 interface FormSubmission {
@@ -66,6 +70,10 @@ const emptyTemplate: FormTemplate = {
   fields: [],
   assignedRoles: ['PACS'],
   approvalRoles: ['Supervisor'],
+  submissionType: 'one-time',
+  frequency: 'daily',
+  dueDate: '',
+  secondApprovalRole: '',
 };
 
 const validationFieldTypes = ['text', 'textarea', 'number', 'date'];
@@ -611,6 +619,60 @@ export default function FormsDashboard({ userRole, userId, userName, branchCode 
                     </label>
                   ))}
                 </div>
+              </div>
+              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
+                <p className="mb-3 text-sm font-medium text-slate-700">Submission Settings</p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-600">Submission Type</label>
+                    <select
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                      value={selectedTemplate.submissionType || 'one-time'}
+                      onChange={(e) => setSelectedTemplate({ ...selectedTemplate, submissionType: e.target.value as 'one-time' | 'recurring' })}
+                    >
+                      <option value="one-time">One-Time</option>
+                      <option value="recurring">Recurring</option>
+                    </select>
+                  </div>
+                  {selectedTemplate.submissionType === 'recurring' && (
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-600">Frequency</label>
+                      <select
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                        value={selectedTemplate.frequency || 'daily'}
+                        onChange={(e) => setSelectedTemplate({ ...selectedTemplate, frequency: e.target.value as 'daily' | 'weekly' | 'fortnightly' | 'monthly' })}
+                      >
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="fortnightly">Fortnightly</option>
+                        <option value="monthly">Monthly</option>
+                      </select>
+                    </div>
+                  )}
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-600">Due Date (Optional)</label>
+                    <input
+                      type="datetime-local"
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                      value={selectedTemplate.dueDate || ''}
+                      onChange={(e) => setSelectedTemplate({ ...selectedTemplate, dueDate: e.target.value })}
+                    />
+                    <p className="mt-1 text-xs text-slate-500">Form will disappear after this date if data not submitted</p>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
+                <p className="mb-3 text-sm font-medium text-slate-700">2nd Approval Role (Optional)</p>
+                <select
+                  className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                  value={selectedTemplate.secondApprovalRole || ''}
+                  onChange={(e) => setSelectedTemplate({ ...selectedTemplate, secondApprovalRole: e.target.value })}
+                >
+                  <option value="">None (Single Approval)</option>
+                  <option value="Manager">Manager</option>
+                  <option value="Supervisor">Supervisor</option>
+                </select>
+                <p className="mt-1 text-xs text-slate-500">If selected, form will require approval from 1st approver and then 2nd approver</p>
               </div>
               <div className="space-y-4">
                 <div className="flex items-center justify-between gap-4">

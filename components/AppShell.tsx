@@ -28,10 +28,12 @@ interface AppShellProps {
   title: string;
   description: string;
   menuItems: MenuItem[];
+  organizationName?: string;
+  logoPath?: string;
   children: React.ReactNode;
 }
 
-export default function AppShell({ userName, userRole, userBranchCode, userImage, title, description, menuItems, children }: AppShellProps) {
+export default function AppShell({ userName, userRole, userBranchCode, userImage, title, description, menuItems, organizationName = 'Dakshin Dinajpur District Central Co-operative Bank Ltd.', logoPath = '/photos/dddccb_logo.png', children }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const popupRef = useRef<HTMLDivElement | null>(null);
@@ -75,16 +77,16 @@ export default function AppShell({ userName, userRole, userBranchCode, userImage
                 </svg>
               </button>
               <Image
-                src="/photos/dddccb_logo.png"
+                src={logoPath}
                 width={80}
                 height={45}
-                alt="DDDCCBL"
+                alt={organizationName}
                 priority
                 loading="eager"
                 className="h-auto w-16 sm:w-20 object-contain"
               />
               <p className="text-xs sm:text-sm font-bold leading-tight hidden sm:block">
-                Dakshin Dinajpur District Central Co-operative Bank Ltd.
+                {organizationName}
               </p>
             </div>
 

@@ -9,34 +9,44 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
   }
   const body = await request.json();
-const formstemplate=await getformtemplatesCollection();
+  
+  // Validate due date if provided
+  if (body.dueDate) {
+    const dueDateObj = new Date(body.dueDate);
+    const now = new Date();
+    if (dueDateObj <= now) {
+      return NextResponse.json({ error: 'Due date must be in the future' }, { status: 400 });
+    }
+  }
 
-    const result =await formstemplate.insertOne({
-          formName:
-            body.formName,
-          description:
-            body.description,
+  const formstemplate = await getformtemplatesCollection();
 
-          fields:
-            body.fields,
+  const templateData: any = {
+    formName: body.formName,
+    description: body.description,
+    fields: body.fields,
+    status: "Active",
+    version: 1,
+    
+    // New fields for recurring/one-time submission
+    submissionType: body.submissionType || "one-time",
+    frequency: body.submissionType === "recurring" ? body.frequency : null,
+    dueDate: body.dueDate ? new Date(body.dueDate) : null,
+    
+    // 2nd approval role
+    secondApprovalRole: body.secondApprovalRole || null,
+    
+    // Track approval stages
+    requiresTwoStageApproval: !!body.secondApprovalRole,
+    
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
 
-          status:
-            "Active",
+  const result = await formstemplate.insertOne(templateData);
 
-          version: 1,
-
-          createdAt:
-            new Date(),
-
-          updatedAt:
-            new Date(),
-        });
-
-    return NextResponse.json({
-      success: true,
-      insertedId:
-        result.insertedId,
-    });
-
-
+  return NextResponse.json({
+    success: true,
+    insertedId: result.insertedId,
+  });
 }

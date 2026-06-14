@@ -24,6 +24,8 @@ async function seedOrganizationSettings() {
     const defaultSettings = {
       settingId: 'global',
       sessionTimeoutMinutes: 15,
+      organizationName: 'Dakshin Dinajpur District Central Co-operative Bank Ltd.',
+      logoPath: '/photos/dddccb_logo.png',
       createdAt: new Date(),
       updatedAt: new Date()
     };
