@@ -23,6 +23,7 @@ interface MenuItem {
 interface AppShellProps {
   userName: string;
   userRole: string;
+  userBranchCode?: string;
   userImage?: string;
   title: string;
   description: string;
@@ -30,7 +31,7 @@ interface AppShellProps {
   children: React.ReactNode;
 }
 
-export default function AppShell({ userName, userRole, userImage, title, description, menuItems, children }: AppShellProps) {
+export default function AppShell({ userName, userRole, userBranchCode, userImage, title, description, menuItems, children }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const popupRef = useRef<HTMLDivElement | null>(null);
@@ -103,6 +104,9 @@ export default function AppShell({ userName, userRole, userImage, title, descrip
                 <div className="hidden sm:block text-right">
                   <p className="text-xs uppercase tracking-[0.3em] text-cyan-600">Welcome</p>
                   <p className="text-sm font-semibold">{userName}</p>
+                  <p className="text-xs text-slate-500">
+                    {userRole}{userBranchCode ? ` • Branch ${userBranchCode}` : ''}
+                  </p>
                 </div>
               </button>
               {profileOpen && (

@@ -4,6 +4,7 @@ import AppShell from '../../components/AppShell';
 import { authOptions } from '../../lib/auth';
 import { getMenusCollection, serializeMenuItems } from '../../lib/mongodb';
 import { getAccessibleSubMenus, hasAccess } from '../../lib/permissions';
+import { normalizeBranchCode } from '../../lib/branchAccess';
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
@@ -14,6 +15,7 @@ export default async function DashboardPage() {
   const userRole = (session.user as any).role as string;
   const userName = session.user.name ?? 'User';
   const userImage = (session.user as any).image as string | undefined;
+  const userBranchCode = normalizeBranchCode((session.user as any).branch_code);
   const menus = await getMenusCollection();
   const menuItems = serializeMenuItems((await menus.find({}).toArray()) as any[]);
 
@@ -23,6 +25,7 @@ export default async function DashboardPage() {
     <AppShell
       userName={userName}
       userRole={userRole}
+      userBranchCode={userBranchCode}
       userImage={userImage}
       title="Dashboard"
       description="Role-based access to menus and reports."

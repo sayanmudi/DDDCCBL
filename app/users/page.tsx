@@ -12,6 +12,7 @@ type PageUserRow = {
   mobile: string;
   role: string;
   branch_code: string;
+  isActive?: boolean;
 };
 
 export default async function UsersPage() {
@@ -47,7 +48,7 @@ export default async function UsersPage() {
 
   const users = (await usersCollection
     .find(userRole === 'Admin' ? {} : userFilter, {
-      projection: { _id: 0, userId: 1, name: 1, mobile: 1, role: 1, branch_code: 1 },
+      projection: { _id: 0, userId: 1, name: 1, mobile: 1, role: 1, branch_code: 1, isActive: 1 },
     })
     .toArray()) as unknown as PageUserRow[];
 
@@ -55,6 +56,7 @@ export default async function UsersPage() {
     <AppShell
       userName={userName}
       userRole={userRole}
+      userBranchCode={viewerBranchCode}
       userImage={userImage}
       title="Users"
       description={

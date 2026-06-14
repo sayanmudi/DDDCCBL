@@ -5,6 +5,7 @@ import AppShell from '../../components/AppShell';
 import { authOptions } from '../../lib/auth';
 import { getAccessibleSubMenus, hasAccess } from '../../lib/permissions';
 import { getMenusCollection, serializeMenuItems } from '../../lib/mongodb';
+import { normalizeBranchCode } from '../../lib/branchAccess';
 
 export default async function ReportsPage() {
   const session = await getServerSession(authOptions);
@@ -15,6 +16,7 @@ export default async function ReportsPage() {
   const userRole = (session.user as any).role as string;
   const userName = session.user.name ?? 'User';
   const userImage = (session.user as any).image as string | undefined;
+  const userBranchCode = normalizeBranchCode((session.user as any).branch_code);
   const menus = await getMenusCollection();
   const menuItems = serializeMenuItems((await menus.find({}).toArray()) as any[]);
   const reportsMenu = menuItems.find((menu: any) => menu.slug === 'reports');
@@ -25,6 +27,7 @@ export default async function ReportsPage() {
     <AppShell
       userName={userName}
       userRole={userRole}
+      userBranchCode={userBranchCode}
       userImage={userImage}
       title="Reports"
       description="Choose the correct report for your role."

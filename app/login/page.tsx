@@ -23,7 +23,12 @@ export default function LoginPage() {
     });
 
     if (result?.error) {
-      setError('Invalid credentials.');
+      // Check if it's a deactivated user error
+      if (result.error.includes('Deactivated')) {
+        setError('User Deactivated. Please contact administrator or the Branch Manager');
+      } else {
+        setError('Invalid credentials.');
+      }
       return;
     }
 

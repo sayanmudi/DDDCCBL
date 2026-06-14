@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 
 interface SettingsPanelProps {
   userId: string;
@@ -11,6 +12,7 @@ interface SettingsPanelProps {
 
 export default function SettingsPanel({ userId, currentMobile = '', currentImage }: SettingsPanelProps) {
   const router = useRouter();
+  const { data: session, update } = useSession();
   const [mobile, setMobile] = useState(currentMobile);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -62,6 +64,8 @@ export default function SettingsPanel({ userId, currentMobile = '', currentImage
       setProfilePhoto(null);
       if (result.updated?.image) {
         setPreviewUrl(result.updated.image);
+        // Update the session with the new image
+        await update({ image: result.updated.image });
       }
       startTransition(() => router.refresh());
     } finally {

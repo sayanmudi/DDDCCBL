@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import AppShell from '../../../components/AppShell';
 import { authOptions } from '../../../lib/auth';
 import { getMenusCollection, serializeMenuItems } from '../../../lib/mongodb';
+import { normalizeBranchCode } from '../../../lib/branchAccess';
 
 const sampleManagerData = [
   { manager: 'Supriyo Chakraborty', teams: 3, cases: 42, approvals: 36, reviews: 18 },
@@ -19,6 +20,7 @@ export default async function ManagerReportsPage() {
   const userRole = (session.user as any).role as string;
   const userName = session.user.name ?? 'User';
   const userImage = (session.user as any).image as string | undefined;
+  const userBranchCode = normalizeBranchCode((session.user as any).branch_code);
   const menus = await getMenusCollection();
   const menuItems = serializeMenuItems((await menus.find({}).toArray()) as any[]);
 
@@ -26,6 +28,7 @@ export default async function ManagerReportsPage() {
     <AppShell
       userName={userName}
       userRole={userRole}
+      userBranchCode={userBranchCode}
       userImage={userImage}
       title="Manager Reports"
       description="Manager-level report summaries and sample metrics."

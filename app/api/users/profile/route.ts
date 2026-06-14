@@ -85,9 +85,9 @@ export async function POST(request: NextRequest) {
     { returnDocument: 'after', projection: { _id: 0, userId: 1, mobile: 1, image: 1 } }
   );
 
-  if (!result?.value) {
+  if (!result) {
     return NextResponse.json({ error: 'Unable to update profile' }, { status: 500 });
   }
 
-  return NextResponse.json({ updated: result.value });
+  return NextResponse.json({ updated: result });
 }

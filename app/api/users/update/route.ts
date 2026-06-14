@@ -18,13 +18,13 @@ export async function POST(request: NextRequest) {
     (await getUserBranchCode(actorId));
 
   const body = await request.json();
-  const { userId, role, resetPassword, branch_code: branchCode } = body;
+  const { userId, role, resetPassword, branch_code: branchCode, isActive } = body;
 
   if (!userId) {
     return NextResponse.json({ error: 'userId is required' }, { status: 400 });
   }
 
-  if (!role && !resetPassword && branchCode === undefined) {
+  if (!role && !resetPassword && branchCode === undefined && isActive === undefined) {
     return NextResponse.json({ error: 'No update action provided' }, { status: 400 });
   }
 
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
 
   const targetRole = String(targetUser.role ?? '');
   const targetBranchCode = normalizeBranchCode(targetUser.branch_code);
-  const updateFields: Record<string, string> = {};
+  const updateFields: Record<string, string | boolean> = {};
 
   if (role) {
     if (!canChangeUserRole(actorRole)) {
@@ -63,6 +63,23 @@ export async function POST(request: NextRequest) {
     updateFields.branch_code = normalizedBranchCode;
   }
 
+  if (isActive !== undefined) {
+    // Check if user has permission to toggle active status
+    if (!['Admin', 'Manager', 'Supervisor'].includes(actorRole)) {
+      return NextResponse.json({ error: 'Only Admin, Manager, or Supervisor can change user status.' }, { status: 403 });
+    }
+    if (userId === actorId) {
+      return NextResponse.json({ error: 'You cannot change your own active status.' }, { status: 403 });
+    }
+    if (actorRole !== 'Admin' && !isSameBranch(actorBranchCode, targetBranchCode)) {
+      return NextResponse.json(
+        { error: 'You can only change status for users in your branch.' },
+        { status: 403 }
+      );
+    }
+    updateFields.isActive = isActive;
+  }
+
   if (resetPassword) {
     if (userId === actorId) {
       return NextResponse.json({ error: 'You cannot reset your own password here.' }, { status: 403 });
@@ -83,15 +100,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'No update action provided' }, { status: 400 });
   }
 
-  const result = await users.findOneAndUpdate(
+  const result = await users.updateOne(
     { userId },
-    { $set: updateFields },
-    { returnDocument: 'after', projection: { _id: 0, userId: 1, role: 1, branch_code: 1 } }
+    { $set: updateFields }
   );
 
-  if (!result?.value) {
+  if (result.matchedCount === 0) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 });
   }
 
-  return NextResponse.json({ updatedUser: result.value });
+  // Fetch the updated user
+  const updatedUser = await users.findOne(
+    { userId },
+    { projection: { _id: 0, userId: 1, role: 1, branch_code: 1, isActive: 1 } }
+  );
+
+  return NextResponse.json({ updatedUser });
 }
+

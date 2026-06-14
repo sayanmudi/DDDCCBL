@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { isSameBranch, normalizeBranchCode } from '../lib/branchAccessUtils';
 import { canChangeBranchCode, canChangeUserRole, canResetPasswordFor } from '../lib/permissions';
@@ -11,6 +11,7 @@ interface UserRow {
   mobile: string;
   role: string;
   branch_code: string;
+  isActive?: boolean;
 }
 
 interface UserManagementTableProps {
@@ -37,11 +38,23 @@ export default function UserManagementTable({
   );
   const [statusMessage, setStatusMessage] = useState<string>('');
   const [loadingUserId, setLoadingUserId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const router = useRouter();
 
   const isAdmin = currentUserRole === 'Admin';
   const showActionsColumn =
     isAdmin || currentUserRole === 'Manager' || currentUserRole === 'Supervisor';
+
+  // Filter users based on search query
+  const filteredUsers = useMemo(() => {
+    if (!searchQuery.trim()) return userList;
+    const query = searchQuery.toLowerCase();
+    return userList.filter(
+      (user) =>
+        user.userId.toLowerCase().includes(query) ||
+        user.name.toLowerCase().includes(query)
+    );
+  }, [userList, searchQuery]);
 
   function canResetPassword(user: UserRow) {
     if (user.userId === currentUserId) return false;
@@ -52,7 +65,7 @@ export default function UserManagementTable({
 
   async function updateUser(
     userId: string,
-    options: { role?: string; resetPassword?: boolean; branch_code?: string } = {}
+    options: { role?: string; resetPassword?: boolean; branch_code?: string; isActive?: boolean } = {}
   ) {
     setLoadingUserId(userId);
     setStatusMessage('');
@@ -81,6 +94,7 @@ export default function UserManagementTable({
                 ...user,
                 role: result.updatedUser.role ?? user.role,
                 branch_code: normalizeBranchCode(result.updatedUser.branch_code ?? user.branch_code),
+                isActive: result.updatedUser.isActive ?? user.isActive,
               }
             : user
         )
@@ -101,11 +115,33 @@ export default function UserManagementTable({
     setStatusMessage('Update complete.');
   }
 
+  function canToggleActiveStatus(user: UserRow) {
+    // Admin, Manager, and Supervisor can toggle active status
+    if (!['Admin', 'Manager', 'Supervisor'].includes(currentUserRole)) return false;
+    // Cannot toggle own status
+    if (user.userId === currentUserId) return false;
+    // Manager and Supervisor can only toggle users in their branch
+    if (currentUserRole !== 'Admin' && !isSameBranch(currentUserBranchCode, user.branch_code)) return false;
+    return true;
+  }
+
   return (
     <div className="space-y-4">
       {statusMessage ? (
         <div className="rounded-3xl border border-cyan-500/30 bg-cyan-500/10 p-4 text-cyan-100">{statusMessage}</div>
       ) : null}
+      
+      {/* Search Bar */}
+      <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-4 shadow-xl shadow-slate-950/20">
+        <input
+          type="text"
+          placeholder="Search by User ID or Name..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-slate-100 placeholder-slate-500 outline-none focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20"
+        />
+      </div>
+
       <div className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/90 shadow-xl shadow-slate-950/20">
         <table className="w-full border-collapse text-left text-sm text-slate-200">
           <thead className="bg-slate-950/90 text-slate-300">
@@ -115,18 +151,21 @@ export default function UserManagementTable({
               <th className="px-6 py-4">Mobile</th>
               <th className="px-6 py-4">Branch</th>
               <th className="px-6 py-4">Role</th>
+              <th className="px-6 py-4">Status</th>
               {showActionsColumn ? <th className="px-6 py-4">Actions</th> : null}
             </tr>
           </thead>
           <tbody>
-            {userList.map((user) => {
+            {filteredUsers.map((user) => {
               const canEditRole = isAdmin && canChangeUserRole(currentUserRole) && user.userId !== currentUserId;
               const canEditBranch =
                 isAdmin && canChangeBranchCode(currentUserRole) && user.userId !== currentUserId;
               const canReset = canResetPassword(user);
+              const canToggleStatus = canToggleActiveStatus(user);
+              const userIsActive = user.isActive !== false; // Default to true if not set
 
               return (
-                <tr key={user.userId} className="border-t border-slate-800">
+                <tr key={user.userId} className={`border-t border-slate-800 ${!userIsActive ? 'opacity-60' : ''}`}>
                   <td className="px-6 py-4 text-cyan-300">{user.userId}</td>
                   <td className="px-6 py-4">{user.name}</td>
                   <td className="px-6 py-4">{user.mobile}</td>
@@ -199,6 +238,26 @@ export default function UserManagementTable({
                       </div>
                     ) : (
                       user.role
+                    )}
+                  </td>
+                  <td className="px-6 py-4">
+                    {canToggleStatus ? (
+                      <button
+                        type="button"
+                        onClick={() => updateUser(user.userId, { isActive: !userIsActive })}
+                        disabled={loadingUserId === user.userId}
+                        className={`rounded-2xl px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed ${
+                          userIsActive
+                            ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                            : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                        }`}
+                      >
+                        {loadingUserId === user.userId ? 'Updating…' : userIsActive ? 'Active' : 'Inactive'}
+                      </button>
+                    ) : (
+                      <span className={userIsActive ? 'text-green-400' : 'text-red-400'}>
+                        {userIsActive ? 'Active' : 'Inactive'}
+                      </span>
                     )}
                   </td>
                   {showActionsColumn ? (

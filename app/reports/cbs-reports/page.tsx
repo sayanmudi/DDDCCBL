@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import AppShell from '../../../components/AppShell';
 import { authOptions } from '../../../lib/auth';
 import { getMenusCollection, serializeMenuItems } from '../../../lib/mongodb';
+import { normalizeBranchCode } from '../../../lib/branchAccess';
 
 const sampleData = [
   { branch: 'Central', transactions: 8582, deposits: 9856232, withdrawals: 622100 },
@@ -20,6 +21,7 @@ export default async function CbsReportsPage() {
   const userRole = (session.user as any).role as string;
   const userName = session.user.name ?? 'User';
   const userImage = (session.user as any).image as string | undefined;
+  const userBranchCode = normalizeBranchCode((session.user as any).branch_code);
   const menus = await getMenusCollection();
   const menuItems = serializeMenuItems((await menus.find({}).toArray()) as any[]);
 
@@ -27,6 +29,7 @@ export default async function CbsReportsPage() {
     <AppShell
       userName={userName}
       userRole={userRole}
+      userBranchCode={userBranchCode}
       userImage={userImage}
       title="CBS Reports"
       description="Centralized branch summary and sample CBS data."

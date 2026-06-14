@@ -20,6 +20,12 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
+        // Check if user is active (default to true if not set)
+        const isActive = user.isActive !== false;
+        if (!isActive) {
+          throw new Error('User Deactivated. Please contact administrator or the Branch Manager');
+        }
+
         const profileImage = user.image;
 
         return {
@@ -37,7 +43,7 @@ export const authOptions: NextAuthOptions = {
     maxAge: 15 * 60, // Default 15 minutes in seconds
   },
   callbacks: {
-    async jwt({ token, user, trigger }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.role = (user as any).role;
         if ((user as any).image) {
@@ -53,8 +59,15 @@ export const authOptions: NextAuthOptions = {
         token.loginTime = Date.now();
       }
       
-      // Check session timeout on every request
-      if (token.loginTime) {
+      // Handle session updates (e.g., profile image changes)
+      if (trigger === 'update' && session) {
+        if (session.image !== undefined) {
+          token.image = session.image;
+        }
+      }
+      
+      // Check session timeout on every request (but not during updates)
+      if (token.loginTime && trigger !== 'update') {
         try {
           const settingsCollection = await getOrganizationSettingsCollection();
           const settings = await settingsCollection.findOne({ settingId: 'global' });
@@ -62,9 +75,9 @@ export const authOptions: NextAuthOptions = {
           const timeoutMs = timeoutMinutes * 60 * 1000;
           const currentTime = Date.now();
           
-          // If session has expired, return null to force logout
+          // If session has expired, mark token as expired
           if (currentTime - (token.loginTime as number) > timeoutMs) {
-            return null as any;
+            token.expired = true;
           }
         } catch (error) {
           console.error('Error checking session timeout:', error);
@@ -74,6 +87,11 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
+      // If token is expired, return null to force logout
+      if (token?.expired) {
+        return null as any;
+      }
+      
       session.user = session.user ?? { name: null };
       if (token?.role) {
         (session.user as any).role = token.role;

@@ -5,6 +5,7 @@ import SettingsPanel from '../../components/SettingsPanel';
 import OrganizationSettings from '../../components/OrganizationSettings';
 import { authOptions } from '../../lib/auth';
 import { getMenusCollection, getUsersCollection, serializeMenuItems } from '../../lib/mongodb';
+import { normalizeBranchCode } from '../../lib/branchAccess';
 
 export default async function SettingsPage() {
   const session = await getServerSession(authOptions);
@@ -16,6 +17,7 @@ export default async function SettingsPage() {
   const userName = session.user.name ?? 'User';
   const userImage = (session.user as any).image as string | undefined;
   const userId = (session.user as any).id as string;
+  const userBranchCode = normalizeBranchCode((session.user as any).branch_code);
 
   const menus = await getMenusCollection();
   const menuItems = serializeMenuItems((await menus.find({}).toArray()) as any[]);
@@ -31,6 +33,7 @@ export default async function SettingsPage() {
     <AppShell
       userName={userName}
       userRole={userRole}
+      userBranchCode={userBranchCode}
       userImage={userImage}
       title="Settings"
       description="Application preferences, roles, and menu configuration."

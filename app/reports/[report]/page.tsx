@@ -4,6 +4,7 @@ import AppShell from '../../../components/AppShell';
 import { authOptions } from '../../../lib/auth';
 import { hasAccess } from '../../../lib/permissions';
 import { getMenusCollection, serializeMenuItems } from '../../../lib/mongodb';
+import { normalizeBranchCode } from '../../../lib/branchAccess';
 
 interface ReportPageProps {
   params: { report: string };
@@ -18,6 +19,7 @@ export default async function ReportDetailPage({ params }: ReportPageProps) {
   const userRole = (session.user as any).role as string;
   const userName = session.user.name ?? 'User';
   const userImage = (session.user as any).image as string | undefined;
+  const userBranchCode = normalizeBranchCode((session.user as any).branch_code);
   const reportSlug = params.report;
   const menus = await getMenusCollection();
   const menuItems = serializeMenuItems((await menus.find({}).toArray()) as any[]);
@@ -29,6 +31,7 @@ export default async function ReportDetailPage({ params }: ReportPageProps) {
       <AppShell
         userName={userName}
         userRole={userRole}
+        userBranchCode={userBranchCode}
         userImage={userImage}
         title="Reports"
         description="Report not found."
@@ -49,6 +52,7 @@ export default async function ReportDetailPage({ params }: ReportPageProps) {
       <AppShell
         userName={userName}
         userRole={userRole}
+        userBranchCode={userBranchCode}
         userImage={userImage}
         title="Access denied"
         description="You do not have permission to view this report."
@@ -66,6 +70,7 @@ export default async function ReportDetailPage({ params }: ReportPageProps) {
     <AppShell
       userName={userName}
       userRole={userRole}
+      userBranchCode={userBranchCode}
       userImage={userImage}
       title={report.title}
       description={`Accessible by ${report.access.join(', ')}`}

@@ -4,6 +4,7 @@ import AppShell from '../../components/AppShell';
 import FormsDashboard from '../../components/FormsDashboard';
 import { authOptions } from '../../lib/auth';
 import { getMenusCollection, serializeMenuItems } from '../../lib/mongodb';
+import { normalizeBranchCode } from '../../lib/branchAccess';
 
 export default async function FormsPage() {
   const session = await getServerSession(authOptions);
@@ -16,6 +17,7 @@ export default async function FormsPage() {
   const userName = session.user.name ?? 'User';
   const userId = (session.user as any).id as string | undefined;
   const branchCode = String((session.user as any).branch_code ?? '').trim();
+  const userBranchCode = normalizeBranchCode(branchCode);
   const menus = await getMenusCollection();
   const menuItems = serializeMenuItems((await menus.find({}).toArray()) as any[]);
 
@@ -23,6 +25,7 @@ export default async function FormsPage() {
     <AppShell
       userName={userName}
       userRole={userRole}
+      userBranchCode={userBranchCode}
       userImage={(session.user as any).image as string | undefined}
       title="Forms"
       description="Create, update, assign, and manage form workflows."
