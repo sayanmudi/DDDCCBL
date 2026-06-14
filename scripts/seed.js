@@ -26,6 +26,7 @@ async function seed() {
         name: 'Sayan Mudi',
         mobile: '9804290021',
         role: 'Admin',
+        branch_code: '001',
         image: '/photos/134_profile.jpg'
       },
       {
@@ -34,6 +35,7 @@ async function seed() {
         name: 'Supriyo Chakraborty',
         mobile: '9804290021',
         role: 'Manager',
+        branch_code: '001',
         image: '/photos/134_profile.jpg'
       },
       {
@@ -42,6 +44,7 @@ async function seed() {
         name: 'Shubhranil Saha',
         mobile: '9804290021',
         role: 'Supervisor',
+        branch_code: '001',
         image: '/photos/134_profile.jpg'
       },      
       {
@@ -50,6 +53,7 @@ async function seed() {
         name: 'Parthajit Sarkar',
         mobile: '9804290021',
         role: 'Teller',
+        branch_code: '001',
         image: '/photos/134_profile.jpg'
       },
       {
@@ -58,6 +62,7 @@ async function seed() {
         name: 'NOKSHA SKUS LTD',
         mobile: '9804290021',
         role: 'PACS',
+        branch_code: '002',
         image: '/photos/134_profile.jpg'
       }
     ]);

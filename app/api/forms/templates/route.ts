@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../../../lib/auth';
+import { normalizeFormField, validateTemplateFields, validateTemplateFormulaFields } from '../../../../lib/formFields';
 import { getFormTemplatesCollection } from '../../../../lib/mongodb';
 import { ObjectId } from 'mongodb';
 
@@ -26,6 +27,17 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const templatesCollection = await getFormTemplatesCollection();
   const now = new Date();
+  const fields = Array.isArray(body.fields) ? body.fields.map(normalizeFormField) : [];
+  const fieldErrors = validateTemplateFields(fields);
+  const formulaErrors = validateTemplateFormulaFields(fields);
+
+  if (fieldErrors.length) {
+    return NextResponse.json({ error: fieldErrors.join(' ') }, { status: 400 });
+  }
+
+  if (formulaErrors.length) {
+    return NextResponse.json({ error: formulaErrors.join(' ') }, { status: 400 });
+  }
 
   if (body._id) {
     const existing = await templatesCollection.findOne({ _id: new ObjectId(body._id) });
@@ -43,7 +55,7 @@ export async function POST(request: NextRequest) {
     const templatePayload = {
       formName: body.formName || '',
       description: body.description || '',
-      fields: Array.isArray(body.fields) ? body.fields : [],
+      fields,
       assignedRoles: Array.isArray(body.assignedRoles) ? body.assignedRoles : [],
       approvalRoles: Array.isArray(body.approvalRoles) ? body.approvalRoles : [],
       updatedAt: now,
@@ -72,7 +84,7 @@ export async function POST(request: NextRequest) {
   const templatePayload = {
     formName: body.formName || '',
     description: body.description || '',
-    fields: Array.isArray(body.fields) ? body.fields : [],
+    fields,
     assignedRoles: Array.isArray(body.assignedRoles) ? body.assignedRoles : [],
     approvalRoles: Array.isArray(body.approvalRoles) ? body.approvalRoles : [],
     status: 'Draft',

@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../../../../lib/auth';
+import {
+  canAccessSubmissionByBranch,
+  getUserBranchCode,
+  normalizeBranchCode,
+  resolveSubmissionBranchCode,
+} from '../../../../../lib/branchAccess';
 import { getFormSubmissionsCollection, getFormTemplatesCollection } from '../../../../../lib/mongodb';
 import { ObjectId } from 'mongodb';
 
@@ -13,9 +19,13 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
   }
 
   const userRole = (session.user as any).role as string;
+  const reviewerId = (session.user as any).id as string | undefined;
   if (userRole !== 'Manager' && userRole !== 'Admin' && userRole !== 'Supervisor') {
     return NextResponse.json({ error: 'Only Manager ,Supervisor or Admin users can review submissions.' }, { status: 403 });
   }
+
+  const reviewerBranchCode =
+    normalizeBranchCode((session.user as any).branch_code) || (await getUserBranchCode(reviewerId));
 
   const body = await request.json();
   const action = body.action;
@@ -53,6 +63,14 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
   const approvalRoles = Array.isArray(formTemplate.approvalRoles) ? formTemplate.approvalRoles : [];
   if (userRole !== 'Admin' && approvalRoles.length > 0 && !approvalRoles.includes(userRole)) {
     return NextResponse.json({ error: 'You are not authorized to approve or reject this submission.' }, { status: 403 });
+  }
+
+  const submissionBranchCode = await resolveSubmissionBranchCode(submission);
+  if (!canAccessSubmissionByBranch(userRole, reviewerBranchCode, submissionBranchCode)) {
+    return NextResponse.json(
+      { error: 'You can only review submissions from your branch.' },
+      { status: 403 }
+    );
   }
 
   const updateFields: any = {
@@ -117,6 +135,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         templateName: updated.templateName,
         submittedBy: updated.submittedBy,
         submittedById: updated.submittedById,
+        branch_code: updated.branch_code ?? null,
         data: updated.data ?? {},
         status: updated.status,
         locked: updated.locked,

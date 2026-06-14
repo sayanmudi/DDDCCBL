@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 
 interface SubmissionFilter {
   submittedBy: string;
@@ -35,6 +35,23 @@ interface SubmissionsReportProps {
   userRole: string;
 }
 
+function statusBadgeClass(status: string) {
+  switch (status) {
+    case 'Approved':
+      return 'bg-emerald-100 text-emerald-800';
+    case 'Rejected':
+      return 'bg-rose-100 text-rose-800';
+    case 'Pending':
+      return 'bg-amber-100 text-amber-800';
+    default:
+      return 'bg-slate-100 text-slate-700';
+  }
+}
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleString();
+}
+
 export default function SubmissionsReport({ userRole }: SubmissionsReportProps) {
   const [filters, setFilters] = useState<SubmissionFilter>({
     submittedBy: '',
@@ -49,6 +66,7 @@ export default function SubmissionsReport({ userRole }: SubmissionsReportProps) 
   const [submissions, setSubmissions] = useState<SubmissionRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
@@ -202,7 +220,16 @@ export default function SubmissionsReport({ userRole }: SubmissionsReportProps) 
       </section>
 
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold">Submission Results</h2>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Submission Results</h2>
+            {!loading && !error ? (
+              <p className="mt-1 text-sm text-slate-500">
+                {submissions.length} submission{submissions.length === 1 ? '' : 's'} found
+              </p>
+            ) : null}
+          </div>
+        </div>
         {loading ? (
           <p className="mt-4 text-sm text-slate-500">Loading submissions…</p>
         ) : error ? (
@@ -210,38 +237,110 @@ export default function SubmissionsReport({ userRole }: SubmissionsReportProps) 
         ) : !submissions.length ? (
           <p className="mt-4 text-sm text-slate-500">No submissions found for current filters.</p>
         ) : (
-          <div className="mt-4 space-y-4">
-            {submissions.map((submission) => (
-              <div key={submission._id} className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="font-semibold text-slate-900">{submission.templateName}</p>
-                    <p className="text-sm text-slate-600">Submitted by: {submission.submittedBy}</p>
-                    <p className="text-sm text-slate-600">Status: {submission.status}</p>
-                  </div>
-                  <div className="space-y-1 text-right text-sm text-slate-500">
-                    <p>Created: {new Date(submission.createdAt).toLocaleString()}</p>
-                    <p>Updated: {new Date(submission.updatedAt).toLocaleString()}</p>
-                  </div>
-                </div>
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-800">
-                    <p className="text-sm font-semibold text-slate-900">Submission Data</p>
-                    <pre className="mt-3 whitespace-pre-wrap break-words text-xs">{JSON.stringify(submission.data, null, 2)}</pre>
-                  </div>
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-800">
-                    <p className="text-sm font-semibold text-slate-900">Review Notes</p>
-                    <p className="mt-3 text-sm text-slate-600">{submission.reviewer_comment || 'None'}</p>
-                    {submission.approvedBy ? (
-                      <p className="mt-2 text-sm text-slate-600">Approved by: {submission.approvedBy} at {new Date(submission.approvedAt ?? submission.updatedAt).toLocaleString()}</p>
-                    ) : null}
-                    {submission.rejectedBy ? (
-                      <p className="mt-2 text-sm text-slate-600">Rejected by: {submission.rejectedBy} at {new Date(submission.rejectedAt ?? submission.updatedAt).toLocaleString()}</p>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            ))}
+          <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-200">
+            <table className="w-full min-w-[960px] border-collapse text-left text-sm text-slate-700">
+              <thead className="bg-slate-100 text-slate-600">
+                <tr>
+                  <th className="px-4 py-3 font-semibold">Form Name</th>
+                  <th className="px-4 py-3 font-semibold">Submitted By</th>
+                  <th className="px-4 py-3 font-semibold">Status</th>
+                  <th className="px-4 py-3 font-semibold">Created</th>
+                  <th className="px-4 py-3 font-semibold">Updated</th>
+                  <th className="px-4 py-3 font-semibold">Review Notes</th>
+                  <th className="px-4 py-3 font-semibold">Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                {submissions.map((submission) => {
+                  const isExpanded = expandedId === submission._id;
+                  const dataEntries = Object.entries(submission.data || {});
+
+                  return (
+                    <Fragment key={submission._id}>
+                      <tr className="border-t border-slate-200 bg-white hover:bg-slate-50">
+                        <td className="px-4 py-3 font-medium text-slate-900">
+                          <div>{submission.templateName}</div>
+                          <div className="mt-1 text-xs text-slate-500">ID: {submission.templateId}</div>
+                        </td>
+                        <td className="px-4 py-3">{submission.submittedBy}</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusBadgeClass(submission.status)}`}>
+                            {submission.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">{formatDate(submission.createdAt)}</td>
+                        <td className="px-4 py-3 whitespace-nowrap">{formatDate(submission.updatedAt)}</td>
+                        <td className="max-w-[220px] px-4 py-3">
+                          <span className="line-clamp-2">{submission.reviewer_comment || '—'}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <button
+                            type="button"
+                            onClick={() => setExpandedId(isExpanded ? null : submission._id)}
+                            className="rounded-xl border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                          >
+                            {isExpanded ? 'Hide' : 'View'}
+                          </button>
+                        </td>
+                      </tr>
+                      {isExpanded ? (
+                        <tr className="border-t border-slate-200 bg-slate-50">
+                          <td colSpan={7} className="px-4 py-4">
+                            <div className="grid gap-4 lg:grid-cols-2">
+                              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                                <p className="border-b border-slate-200 bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900">
+                                  Submission Data
+                                </p>
+                                {dataEntries.length ? (
+                                  <table className="w-full border-collapse text-sm">
+                                    <tbody>
+                                      {dataEntries.map(([field, value]) => (
+                                        <tr key={field} className="border-t border-slate-100">
+                                          <td className="w-1/3 px-4 py-2 font-medium text-slate-600">{field}</td>
+                                          <td className="px-4 py-2 text-slate-800">{String(value ?? '—')}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                ) : (
+                                  <p className="px-4 py-3 text-sm text-slate-500">No submission data recorded.</p>
+                                )}
+                              </div>
+                              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                                <p className="border-b border-slate-200 bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900">
+                                  Review Details
+                                </p>
+                                <div className="space-y-2 px-4 py-3 text-sm text-slate-700">
+                                  <p>
+                                    <span className="font-medium text-slate-900">Comment:</span>{' '}
+                                    {submission.reviewer_comment || 'None'}
+                                  </p>
+                                  {submission.approvedBy ? (
+                                    <p>
+                                      <span className="font-medium text-slate-900">Approved by:</span> {submission.approvedBy}{' '}
+                                      at {formatDate(submission.approvedAt ?? submission.updatedAt)}
+                                    </p>
+                                  ) : null}
+                                  {submission.rejectedBy ? (
+                                    <p>
+                                      <span className="font-medium text-slate-900">Rejected by:</span> {submission.rejectedBy}{' '}
+                                      at {formatDate(submission.rejectedAt ?? submission.updatedAt)}
+                                    </p>
+                                  ) : null}
+                                  {!submission.approvedBy && !submission.rejectedBy ? (
+                                    <p className="text-slate-500">No review action recorded yet.</p>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </section>

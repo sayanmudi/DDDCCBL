@@ -26,7 +26,8 @@ export const authOptions: NextAuthOptions = {
           id: user.userId,
           name: user.name,
           role: user.role,
-          image: profileImage
+          image: profileImage,
+          branch_code: user.branch_code,
         } as any;
       }
     })
@@ -44,6 +45,9 @@ export const authOptions: NextAuthOptions = {
         if ((user as any).id) {
           token.sub = (user as any).id;
         }
+        if ((user as any).branch_code !== undefined) {
+          token.branch_code = (user as any).branch_code;
+        }
       }
       return token;
     },
@@ -57,6 +61,9 @@ export const authOptions: NextAuthOptions = {
       }
       if (token?.image) {
         (session.user as any).image = token.image;
+      }
+      if (token?.branch_code !== undefined) {
+        (session.user as any).branch_code = token.branch_code;
       }
       return session;
     }

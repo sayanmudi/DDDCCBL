@@ -1,10 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../../../lib/auth';
-import { getFormSubmissionsCollection, getFormTemplatesCollection } from '../../../../lib/mongodb';
+import {
+  filterSubmissionsByBranch,
+  getUserBranchCode,
+  normalizeBranchCode,
+} from '../../../../lib/branchAccess';
+import { applyFormulaFields, getMissingRequiredFields, normalizeFormField, validateFieldValues } from '../../../../lib/formFields';
+import { getFormSubmissionsCollection, getFormTemplatesCollection, getUsersCollection } from '../../../../lib/mongodb';
 import { ObjectId } from 'mongodb';
 
+function serializeSubmission(submission: any) {
+  return {
+    _id: submission._id.toString(),
+    templateId: submission.templateId,
+    templateName: submission.templateName,
+    submittedBy: submission.submittedBy,
+    submittedById: submission.submittedById,
+    branch_code: submission.branch_code ?? null,
+    data: submission.data ?? {},
+    status: submission.status,
+    locked: submission.locked,
+    reviewer_comment: submission.reviewer_comment ?? submission.managerComment ?? '',
+    createdAt: submission.createdAt?.toISOString?.() ?? submission.createdAt,
+    updatedAt: submission.updatedAt?.toISOString?.() ?? submission.updatedAt,
+    approvedBy: submission.approvedBy ?? null,
+    approvedAt: submission.approvedAt?.toISOString?.() ?? submission.approvedAt ?? null,
+    rejectedBy: submission.rejectedBy ?? null,
+    rejectedAt: submission.rejectedAt?.toISOString?.() ?? submission.rejectedAt ?? null,
+  };
+}
+
 export async function GET(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  const sessionUser = session?.user as { id?: string; role?: string; branch_code?: string } | undefined;
+  const userRole = sessionUser?.role ?? '';
+  const userId = sessionUser?.id;
+  const viewerBranchCode = normalizeBranchCode(sessionUser?.branch_code) || (await getUserBranchCode(userId));
+
   const params = request.nextUrl.searchParams;
   const status = params.get('status');
   const submittedBy = params.get('submittedBy');
@@ -74,54 +107,13 @@ export async function GET(request: NextRequest) {
 
   const submissionsCollection = await getFormSubmissionsCollection();
   const submissions = await submissionsCollection.find(filter).sort({ updatedAt: -1 }).toArray();
+  const scopedSubmissions = await filterSubmissionsByBranch(submissions, userRole, viewerBranchCode);
 
   return NextResponse.json({
     success: true,
-    submissions: submissions.map((submission) => ({
-      _id: submission._id.toString(),
-      templateId: submission.templateId,
-      templateName: submission.templateName,
-      submittedBy: submission.submittedBy,
-      submittedById: submission.submittedById,
-      data: submission.data ?? {},
-      status: submission.status,
-      locked: submission.locked,
-      reviewer_comment: submission.reviewer_comment ?? submission.managerComment ?? '',
-      createdAt: submission.createdAt?.toISOString?.() ?? submission.createdAt,
-      updatedAt: submission.updatedAt?.toISOString?.() ?? submission.updatedAt,
-      approvedBy: submission.approvedBy ?? null,
-      approvedAt: submission.approvedAt?.toISOString?.() ?? submission.approvedAt ?? null,
-      rejectedBy: submission.rejectedBy ?? null,
-      rejectedAt: submission.rejectedAt?.toISOString?.() ?? submission.rejectedAt ?? null,
-    })),
+    submissions: scopedSubmissions.map(serializeSubmission),
   });
 }
-
-const cleanOptions = (options: unknown) =>
-  Array.isArray(options) ? options.map((option) => String(option).trim()).filter(Boolean) : [];
-
-const getSelectedCheckboxOptions = (value: unknown) =>
-  String(value ?? '').split(',').map((option) => option.trim()).filter(Boolean);
-
-const isRequiredField = (field: any) => field.required === true || field.required === 'true';
-
-const getMissingRequiredFields = (fields: any[], data: Record<string, unknown>) =>
-  fields
-    .map((field, index) => ({ field, index }))
-    .filter(({ field }) => {
-      if (!isRequiredField(field)) return false;
-      const label = String(field.label ?? '');
-      const value = data[label];
-
-      if (field.type === 'checkbox') {
-        return cleanOptions(field.options).length
-          ? getSelectedCheckboxOptions(value).length === 0
-          : value !== true && value !== 'true';
-      }
-
-      return !String(value ?? '').trim();
-    })
-    .map(({ field, index }) => String(field.label ?? '').trim() || `Field ${index + 1}`);
 
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -156,14 +148,37 @@ export async function POST(request: NextRequest) {
 
   const submissionData =
     body.data && typeof body.data === 'object' && !Array.isArray(body.data) ? body.data : {};
-  const missingRequiredFields = getMissingRequiredFields(
-    Array.isArray(template.fields) ? template.fields : [],
-    submissionData
-  );
+  const fields = Array.isArray(template.fields) ? template.fields.map(normalizeFormField) : [];
+  const missingRequiredFields = getMissingRequiredFields(fields, submissionData);
 
   if (missingRequiredFields.length) {
     return NextResponse.json(
       { error: `Please fill required field${missingRequiredFields.length > 1 ? 's' : ''}: ${missingRequiredFields.join(', ')}.` },
+      { status: 400 }
+    );
+  }
+
+  const validationErrors = validateFieldValues(fields, submissionData);
+  if (validationErrors.length) {
+    return NextResponse.json({ error: validationErrors.join(' ') }, { status: 400 });
+  }
+
+  const { data: computedData, errors: formulaErrors } = applyFormulaFields(
+    fields,
+    Object.fromEntries(Object.entries(submissionData).map(([key, value]) => [key, String(value ?? '')]))
+  );
+
+  if (formulaErrors.length) {
+    return NextResponse.json({ error: formulaErrors.join(' ') }, { status: 400 });
+  }
+
+  const usersCollection = await getUsersCollection();
+  const submitter = await usersCollection.findOne({ userId }, { projection: { branch_code: 1 } });
+  const branchCode = normalizeBranchCode(submitter?.branch_code);
+
+  if (!branchCode) {
+    return NextResponse.json(
+      { error: 'Your account is missing a branch code. Contact an administrator.' },
       { status: 400 }
     );
   }
@@ -183,10 +198,11 @@ export async function POST(request: NextRequest) {
       { _id: existingId },
       {
         $set: {
-          data: submissionData,
+          data: computedData,
           status: 'Pending',
           locked: true,
           reviewer_comment: '',
+          branch_code: branchCode,
           updatedAt: now,
         },
       },
@@ -203,23 +219,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      submission: {
-        _id: updatedSubmission._id.toString(),
-        templateId: updatedSubmission.templateId,
-        templateName: updatedSubmission.templateName,
-        submittedBy: updatedSubmission.submittedBy,
-        submittedById: updatedSubmission.submittedById,
-        data: updatedSubmission.data ?? {},
-        status: updatedSubmission.status,
-        locked: updatedSubmission.locked,
-        reviewer_comment: updatedSubmission.reviewer_comment ?? '',
-        createdAt: updatedSubmission.createdAt?.toISOString?.() ?? updatedSubmission.createdAt,
-        updatedAt: updatedSubmission.updatedAt?.toISOString?.() ?? updatedSubmission.updatedAt,
-        approvedBy: updatedSubmission.approvedBy ?? null,
-        approvedAt: updatedSubmission.approvedAt?.toISOString?.() ?? updatedSubmission.approvedAt ?? null,
-        rejectedBy: updatedSubmission.rejectedBy ?? null,
-        rejectedAt: updatedSubmission.rejectedAt?.toISOString?.() ?? updatedSubmission.rejectedAt ?? null,
-      },
+      submission: serializeSubmission(updatedSubmission),
     });
   }
 
@@ -228,7 +228,8 @@ export async function POST(request: NextRequest) {
     templateName: template.formName,
     submittedBy: userName,
     submittedById: userId,
-    data: submissionData,
+    branch_code: branchCode,
+    data: computedData,
     status: 'Pending',
     locked: true,
     reviewer_comment: '',
@@ -242,13 +243,14 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     success: true,
-    submission: {
-      _id: result.insertedId.toString(),
+    submission: serializeSubmission({
+      _id: result.insertedId,
       templateId,
       templateName: template.formName,
       submittedBy: userName,
       submittedById: userId,
-      data: submissionData,
+      branch_code: branchCode,
+      data: computedData,
       status: 'Pending',
       locked: true,
       reviewer_comment: '',
@@ -258,6 +260,6 @@ export async function POST(request: NextRequest) {
       rejectedAt: null,
       createdAt: now,
       updatedAt: now,
-    },
+    }),
   });
 }

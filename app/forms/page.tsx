@@ -15,6 +15,7 @@ export default async function FormsPage() {
   const userRole = (session.user as any).role as string;
   const userName = session.user.name ?? 'User';
   const userId = (session.user as any).id as string | undefined;
+  const branchCode = String((session.user as any).branch_code ?? '').trim();
   const menus = await getMenusCollection();
   const menuItems = serializeMenuItems((await menus.find({}).toArray()) as any[]);
 
@@ -27,7 +28,7 @@ export default async function FormsPage() {
       description="Create, update, assign, and manage form workflows."
       menuItems={menuItems}
     >
-      <FormsDashboard userRole={userRole} userId={userId} userName={userName} />
+      <FormsDashboard userRole={userRole} userId={userId} userName={userName} branchCode={branchCode} />
     </AppShell>
   );
 }

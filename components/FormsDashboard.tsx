@@ -1,13 +1,24 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import {
+  applyFormulaFields,
+  cleanOptions,
+  FORMULA_OPERATORS,
+  getFormulaOperatorLabel,
+  getMissingRequiredFields,
+  getSelectedCheckboxOptions,
+  isRequiredValue,
+  normalizeFormField,
+  validateFieldValues,
+  validateTemplateFields,
+  validateTemplateFormulaFields,
+  type FormFieldDefinition,
+  type FormulaOperator,
+  type ValidationRules,
+} from '../lib/formFields';
 
-interface FormField {
-  label: string;
-  type: string;
-  required: boolean;
-  options?: string[];
-}
+interface FormField extends FormFieldDefinition {}
 
 interface FormTemplate {
   _id?: string;
@@ -25,6 +36,7 @@ interface FormSubmission {
   templateName: string;
   submittedBy: string;
   submittedById: string;
+  branch_code?: string | null;
   data: Record<string, string>;
   status: string;
   locked: boolean;
@@ -41,19 +53,12 @@ interface FormsDashboardProps {
   userRole: string;
   userId?: string;
   userName: string;
+  branchCode?: string;
 }
 
 const roleOptions = ['Manager', 'Supervisor', 'Teller','PACS'];
-const fieldTypes = ['text', 'number', 'date', 'textarea', 'dropdown', 'checkbox'];
+const fieldTypes = ['text', 'number', 'date', 'textarea', 'dropdown', 'checkbox', 'formula'];
 const optionFieldTypes = ['dropdown', 'checkbox'];
-const cleanOptions = (options?: string[]) => options?.map((option) => String(option).trim()).filter(Boolean) ?? [];
-const isRequiredValue = (value: unknown) => value === true || value === 'true';
-const normalizeFormField = (field: any): FormField => ({
-  label: typeof field?.label === 'string' ? field.label : '',
-  type: fieldTypes.includes(field?.type) ? field.type : 'text',
-  required: isRequiredValue(field?.required),
-  options: Array.isArray(field?.options) ? field.options.map((option: unknown) => String(option)) : [],
-});
 
 const emptyTemplate: FormTemplate = {
   formName: '',
@@ -63,7 +68,75 @@ const emptyTemplate: FormTemplate = {
   approvalRoles: ['Supervisor'],
 };
 
-export default function FormsDashboard({ userRole, userId, userName }: FormsDashboardProps) {
+const validationFieldTypes = ['text', 'textarea', 'number', 'date'];
+
+function formatSubmissionValue(value: unknown) {
+  if (value === true || value === 'true') return 'Yes';
+  if (value === false || value === 'false') return 'No';
+  const text = String(value ?? '').trim();
+  return text || '—';
+}
+
+function getFieldValidationProps(field: FormField) {
+  const rules = field.validation;
+  if (!rules) return {};
+
+  if (field.type === 'text' || field.type === 'textarea') {
+    return {
+      minLength: rules.minLength,
+      maxLength: rules.maxLength,
+      pattern: rules.pattern,
+      title: rules.patternMessage,
+    };
+  }
+
+  if (field.type === 'number') {
+    return {
+      min: rules.min,
+      max: rules.max,
+    };
+  }
+
+  if (field.type === 'date') {
+    return {
+      min: rules.minDate,
+      max: rules.maxDate,
+    };
+  }
+
+  return {};
+}
+
+function SubmissionDataTable({ data }: { data: Record<string, string> }) {
+  const entries = Object.entries(data || {});
+
+  if (!entries.length) {
+    return <p className="text-sm text-slate-500">No submission data recorded.</p>;
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+      <table className="w-full min-w-[320px] border-collapse text-sm">
+        <thead className="bg-slate-100 text-slate-600">
+          <tr>
+            <th className="px-4 py-2 text-left font-semibold">Field</th>
+            <th className="px-4 py-2 text-left font-semibold">Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          {entries.map(([field, value]) => (
+            <tr key={field} className="border-t border-slate-100">
+              <td className="px-4 py-2 font-medium text-slate-600">{field}</td>
+              <td className="px-4 py-2 text-slate-800 break-words">{formatSubmissionValue(value)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export default function FormsDashboard({ userRole, userId, userName, branchCode = '' }: FormsDashboardProps) {
   const [templates, setTemplates] = useState<FormTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<FormTemplate>(emptyTemplate);
   const [submissions, setSubmissions] = useState<FormSubmission[]>([]);
@@ -93,12 +166,25 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
   const canReviewSubmission = (submission: FormSubmission) => {
     if (userRole === 'Admin') return true;
     const template = templates.find((item) => item._id === submission.templateId);
-    return template ? Array.isArray(template.approvalRoles) && template.approvalRoles.includes(userRole) : false;
+    const hasApprovalRole = template
+      ? Array.isArray(template.approvalRoles) && template.approvalRoles.includes(userRole)
+      : false;
+    if (!hasApprovalRole) return false;
+
+    if (userRole === 'Manager' || userRole === 'Supervisor') {
+      const submissionBranch = String(submission.branch_code ?? '').trim();
+      const reviewerBranch = String(branchCode ?? '').trim();
+      if (!reviewerBranch || !submissionBranch || reviewerBranch !== submissionBranch) {
+        return false;
+      }
+    }
+
+    return true;
   };
 
   const reviewableSubmissions = useMemo(
     () => pendingSubmissions.filter(canReviewSubmission),
-    [pendingSubmissions, templates, userRole]
+    [pendingSubmissions, templates, userRole, branchCode]
   );
 
   useEffect(() => {
@@ -118,9 +204,9 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
         });
         const existing = mySubmissions.find((submission) => submission.templateId === activeTemplateId && submission.status !== 'Approved');
         if (existing) {
-          setFormData({ ...newValues, ...existing.data });
+          setFormData(applyFormulaFields(template.fields, { ...newValues, ...existing.data }).data);
         } else {
-          setFormData(newValues);
+          setFormData(applyFormulaFields(template.fields, newValues).data);
         }
       }
     }
@@ -143,10 +229,10 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
 
   const loadSubmissions = async () => {
     const params = new URLSearchParams();
-    if ((userRole === 'Teller' ||userRole === 'PACS') && userId) {
+    if ((userRole === 'Teller' || userRole === 'PACS') && userId) {
       params.set('submittedById', userId);
     }
-    if (userRole === 'Manager') {
+    if (userRole === 'Manager' || userRole === 'Supervisor') {
       params.set('status', 'Pending');
     }
     const url = `/api/forms/submissions?${params.toString()}`;
@@ -171,6 +257,24 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
     setSelectedTemplate((current) => {
       const fields = [...current.fields];
       fields[index] = { ...fields[index], ...field };
+      return { ...current, fields };
+    });
+  };
+
+  const updateFieldValidation = (index: number, updates: Partial<ValidationRules>) => {
+    setSelectedTemplate((current) => {
+      const fields = [...current.fields];
+      const field = fields[index];
+      const validation = { ...(field.validation ?? {}), ...updates };
+      const cleaned = Object.fromEntries(
+        Object.entries(validation).filter(([, value]) => value !== '' && value !== undefined)
+      ) as ValidationRules;
+
+      fields[index] = {
+        ...field,
+        validation: Object.keys(cleaned).length ? cleaned : undefined,
+      };
+
       return { ...current, fields };
     });
   };
@@ -214,10 +318,19 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
     ...selectedTemplate,
     fields: selectedTemplate.fields.map((field) => ({
       ...field,
-      required: isRequiredValue(field.required),
+      required: field.type === 'formula' ? false : isRequiredValue(field.required),
       options: optionFieldTypes.includes(field.type)
         ? cleanOptions(field.options)
         : [],
+      ...(field.type === 'formula' && field.formula
+        ? {
+            formula: {
+              operator: field.formula.operator,
+              operandLabels: field.formula.operandLabels,
+            },
+          }
+        : {}),
+      ...(field.validation ? { validation: field.validation } : {}),
     })),
   });
 
@@ -237,6 +350,16 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
     }
     if (!selectedTemplate.approvalRoles.length) {
       setStatusMessage('Select at least one approval role.');
+      return;
+    }
+    const fieldErrors = validateTemplateFields(selectedTemplate.fields);
+    if (fieldErrors.length) {
+      setStatusMessage(fieldErrors.join(' '));
+      return;
+    }
+    const formulaErrors = validateTemplateFormulaFields(selectedTemplate.fields);
+    if (formulaErrors.length) {
+      setStatusMessage(formulaErrors.join(' '));
       return;
     }
     setIsSaving(true);
@@ -283,8 +406,39 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
   };
 
   const handleFieldValueChange = (label: string, value: string) => {
-    setFormData((current) => ({ ...current, [label]: value }));
+    setFormData((current) => {
+      const updated = { ...current, [label]: value };
+      const template = templates.find((item) => item._id === activeTemplateId);
+      if (!template) return updated;
+      return applyFormulaFields(template.fields, updated).data;
+    });
   };
+
+  const toggleFormulaOperand = (fieldIndex: number, operandLabel: string, checked: boolean) => {
+    setSelectedTemplate((current) => {
+      const fields = [...current.fields];
+      const field = fields[fieldIndex];
+      const operandLabels = field.formula?.operandLabels ?? [];
+      const nextOperands = checked
+        ? Array.from(new Set([...operandLabels, operandLabel]))
+        : operandLabels.filter((item) => item !== operandLabel);
+
+      fields[fieldIndex] = {
+        ...field,
+        formula: {
+          operator: field.formula?.operator ?? 'add',
+          operandLabels: nextOperands,
+        },
+      };
+
+      return { ...current, fields };
+    });
+  };
+
+  const getNumberFieldLabels = (fields: FormField[], excludeIndex: number) =>
+    fields
+      .filter((field, index) => index !== excludeIndex && field.type === 'number' && field.label.trim())
+      .map((field) => field.label.trim());
 
   const getFieldOptions = (field: FormField) => cleanOptions(field.options);
 
@@ -303,7 +457,10 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
       } else {
         selectedOptions.delete(option);
       }
-      return { ...current, [label]: Array.from(selectedOptions).join(', ') };
+      const updated = { ...current, [label]: Array.from(selectedOptions).join(', ') };
+      const template = templates.find((item) => item._id === activeTemplateId);
+      if (!template) return updated;
+      return applyFormulaFields(template.fields, updated).data;
     });
   };
 
@@ -312,19 +469,8 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
   const isCheckboxOptionChecked = (value: string | undefined, option: string) =>
     getSelectedCheckboxOptions(value).includes(option);
 
-  const getMissingRequiredFields = (template: FormTemplate, data: Record<string, string>) =>
-    template.fields
-      .filter((field) => {
-        if (!isRequiredValue(field.required)) return false;
-        const value = data[field.label];
-        if (field.type === 'checkbox') {
-          return getFieldOptions(field).length
-            ? getSelectedCheckboxOptions(value).length === 0
-            : !isCheckboxChecked(value);
-        }
-        return !String(value ?? '').trim();
-      })
-      .map((field, index) => field.label || `Field ${index + 1}`);
+  const getMissingRequiredFieldsForTemplate = (template: FormTemplate, data: Record<string, string>) =>
+    getMissingRequiredFields(template.fields, data);
 
   const submitAssignedForm = async () => {
     if (!activeTemplateId) {
@@ -336,15 +482,28 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
       setStatusMessage('Template not found.');
       return;
     }
-    const missingRequiredFields = getMissingRequiredFields(template, formData);
+    const missingRequiredFields = getMissingRequiredFieldsForTemplate(template, formData);
     if (missingRequiredFields.length) {
       setStatusMessage(`Please fill required field${missingRequiredFields.length > 1 ? 's' : ''}: ${missingRequiredFields.join(', ')}.`);
       return;
     }
+
+    const validationErrors = validateFieldValues(template.fields, formData);
+    if (validationErrors.length) {
+      setStatusMessage(validationErrors.join(' '));
+      return;
+    }
+
+    const { data: computedData, errors: formulaErrors } = applyFormulaFields(template.fields, formData);
+    if (formulaErrors.length) {
+      setStatusMessage(formulaErrors.join(' '));
+      return;
+    }
+
     const response = await fetch('/api/forms/submissions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ templateId: activeTemplateId, data: formData }),
+      body: JSON.stringify({ templateId: activeTemplateId, data: computedData }),
     });
     const payload = await response.json();
     if (payload.success) {
@@ -481,7 +640,25 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
                           <select
                             className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-3 py-2.5 sm:py-2 text-sm"
                             value={field.type}
-                            onChange={(e) => setTemplateField(index, { type: e.target.value, options: optionFieldTypes.includes(e.target.value) ? field.options ?? [] : [] })}
+                            onChange={(e) => {
+                              const newType = e.target.value;
+                              if (newType === 'formula') {
+                                setTemplateField(index, {
+                                  type: newType,
+                                  required: false,
+                                  options: [],
+                                  validation: undefined,
+                                  formula: field.formula ?? { operator: 'add', operandLabels: [] },
+                                });
+                                return;
+                              }
+                              setTemplateField(index, {
+                                type: newType,
+                                options: optionFieldTypes.includes(newType) ? field.options ?? [] : [],
+                                formula: undefined,
+                                validation: validationFieldTypes.includes(newType) ? field.validation : undefined,
+                              });
+                            }}
                           >
                             {fieldTypes.map((type) => (
                               <option key={type} value={type}>{type}</option>
@@ -490,15 +667,19 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
                         </div>
                       </div>
                       <div className="mt-4 grid gap-4 grid-cols-1 sm:grid-cols-2">
-                        <label className="inline-flex items-center gap-2 text-sm text-slate-700">
-                          <input
-                            type="checkbox"
-                            checked={field.required}
-                            onChange={(e) => setTemplateField(index, { required: e.target.checked })}
-                            className="h-4 w-4 rounded border-slate-300 text-cyan-600 cursor-pointer"
-                          />
-                          Required
-                        </label>
+                        {field.type !== 'formula' ? (
+                          <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={field.required}
+                              onChange={(e) => setTemplateField(index, { required: e.target.checked })}
+                              className="h-4 w-4 rounded border-slate-300 text-cyan-600 cursor-pointer"
+                            />
+                            Required
+                          </label>
+                        ) : (
+                          <p className="text-sm text-slate-500">Formula fields are auto-calculated and not required.</p>
+                        )}
                         {optionFieldTypes.includes(field.type) ? (
                           <div>
                             <label className="mb-2 block text-sm font-medium text-slate-700">Options (semicolon separated)</label>
@@ -510,6 +691,142 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
                           </div>
                         ) : null}
                       </div>
+                      {validationFieldTypes.includes(field.type) ? (
+                        <div className="mt-4 space-y-4 rounded-2xl border border-amber-200 bg-amber-50 p-3 sm:p-4">
+                          <p className="text-sm font-medium text-slate-700">Validation Rules</p>
+                          {field.type === 'text' || field.type === 'textarea' ? (
+                            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+                              <div>
+                                <label className="mb-2 block text-sm font-medium text-slate-700">Min Length</label>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                                  value={field.validation?.minLength ?? ''}
+                                  onChange={(e) => updateFieldValidation(index, { minLength: e.target.value ? Number(e.target.value) : undefined })}
+                                />
+                              </div>
+                              <div>
+                                <label className="mb-2 block text-sm font-medium text-slate-700">Max Length</label>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                                  value={field.validation?.maxLength ?? ''}
+                                  onChange={(e) => updateFieldValidation(index, { maxLength: e.target.value ? Number(e.target.value) : undefined })}
+                                />
+                              </div>
+                              <div className="sm:col-span-2">
+                                <label className="mb-2 block text-sm font-medium text-slate-700">Pattern (regex)</label>
+                                <input
+                                  className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                                  placeholder="e.g. ^[A-Za-z ]+$"
+                                  value={field.validation?.pattern ?? ''}
+                                  onChange={(e) => updateFieldValidation(index, { pattern: e.target.value || undefined })}
+                                />
+                              </div>
+                              <div className="sm:col-span-2">
+                                <label className="mb-2 block text-sm font-medium text-slate-700">Pattern Error Message</label>
+                                <input
+                                  className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                                  placeholder="Shown when pattern validation fails"
+                                  value={field.validation?.patternMessage ?? ''}
+                                  onChange={(e) => updateFieldValidation(index, { patternMessage: e.target.value || undefined })}
+                                />
+                              </div>
+                            </div>
+                          ) : null}
+                          {field.type === 'number' ? (
+                            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+                              <div>
+                                <label className="mb-2 block text-sm font-medium text-slate-700">Min Value</label>
+                                <input
+                                  type="number"
+                                  className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                                  value={field.validation?.min ?? ''}
+                                  onChange={(e) => updateFieldValidation(index, { min: e.target.value ? Number(e.target.value) : undefined })}
+                                />
+                              </div>
+                              <div>
+                                <label className="mb-2 block text-sm font-medium text-slate-700">Max Value</label>
+                                <input
+                                  type="number"
+                                  className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                                  value={field.validation?.max ?? ''}
+                                  onChange={(e) => updateFieldValidation(index, { max: e.target.value ? Number(e.target.value) : undefined })}
+                                />
+                              </div>
+                            </div>
+                          ) : null}
+                          {field.type === 'date' ? (
+                            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+                              <div>
+                                <label className="mb-2 block text-sm font-medium text-slate-700">Min Date</label>
+                                <input
+                                  type="date"
+                                  className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                                  value={field.validation?.minDate ?? ''}
+                                  onChange={(e) => updateFieldValidation(index, { minDate: e.target.value || undefined })}
+                                />
+                              </div>
+                              <div>
+                                <label className="mb-2 block text-sm font-medium text-slate-700">Max Date</label>
+                                <input
+                                  type="date"
+                                  className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                                  value={field.validation?.maxDate ?? ''}
+                                  onChange={(e) => updateFieldValidation(index, { maxDate: e.target.value || undefined })}
+                                />
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+                      {field.type === 'formula' ? (
+                        <div className="mt-4 space-y-4 rounded-2xl border border-cyan-200 bg-cyan-50 p-3 sm:p-4">
+                          <div>
+                            <label className="mb-2 block text-sm font-medium text-slate-700">Formula Operation</label>
+                            <select
+                              className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                              value={field.formula?.operator ?? 'add'}
+                              onChange={(e) =>
+                                setTemplateField(index, {
+                                  formula: {
+                                    operator: e.target.value as FormulaOperator,
+                                    operandLabels: field.formula?.operandLabels ?? [],
+                                  },
+                                })
+                              }
+                            >
+                              {FORMULA_OPERATORS.map((operator) => (
+                                <option key={operator.value} value={operator.value}>
+                                  {operator.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <p className="mb-2 text-sm font-medium text-slate-700">Number Fields (select at least 2)</p>
+                            {getNumberFieldLabels(selectedTemplate.fields, index).length ? (
+                              <div className="grid gap-2 sm:grid-cols-2">
+                                {getNumberFieldLabels(selectedTemplate.fields, index).map((operandLabel) => (
+                                  <label key={operandLabel} className="inline-flex items-center gap-2 text-sm text-slate-800">
+                                    <input
+                                      type="checkbox"
+                                      checked={field.formula?.operandLabels.includes(operandLabel) ?? false}
+                                      onChange={(e) => toggleFormulaOperand(index, operandLabel, e.target.checked)}
+                                      className="h-4 w-4 rounded border-slate-300 text-cyan-600 cursor-pointer"
+                                    />
+                                    {operandLabel}
+                                  </label>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-slate-500">Add number fields above to use as formula operands.</p>
+                            )}
+                          </div>
+                        </div>
+                      ) : null}
                       <div className="mt-4 flex justify-end">
                         <button
                           type="button"
@@ -678,6 +995,11 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
                             {field.label}{field.required ? ' *' : ''}
                           </label>
                           <p className="mt-1 text-xs text-slate-500">Type: {field.type}</p>
+                          {field.type === 'formula' && field.formula ? (
+                            <p className="mt-1 text-xs text-slate-500 break-words">
+                              Formula: {getFormulaOperatorLabel(field.formula.operator)} of {field.formula.operandLabels.join(', ')}
+                            </p>
+                          ) : null}
                           {field.options && field.options.length > 0 && (
                             <p className="mt-1 text-xs text-slate-500 break-words">Options: {field.options.join(', ')}</p>
                           )}
@@ -720,6 +1042,13 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
                                 <option key={option} value={option}>{option}</option>
                               ))}
                             </select>
+                          ) : field.type === 'formula' ? (
+                            <input
+                              type="text"
+                              readOnly
+                              placeholder="Auto-calculated"
+                              className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-500"
+                            />
                           ) : (
                             <input
                               type={field.type}
@@ -791,7 +1120,7 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
                     <p className="text-xs sm:text-sm text-slate-600">Approved by: {currentSubmission.approvedBy} at {new Date(currentSubmission.approvedAt ?? currentSubmission.updatedAt).toLocaleString()}</p>
                   ) : null}
                   <div className="overflow-x-auto">
-                    <pre className="whitespace-pre-wrap break-words text-xs">{JSON.stringify(currentSubmission.data, null, 2)}</pre>
+                    <SubmissionDataTable data={currentSubmission.data} />
                   </div>
                 </div>
               ) : currentSubmission && currentSubmission.status === 'Rejected' ? (
@@ -820,12 +1149,18 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
                             <label className="block text-xs sm:text-sm font-medium text-slate-700">
                               {field.label}{field.required ? ' *' : ''}
                             </label>
+                            {field.type === 'formula' && field.formula ? (
+                              <p className="text-xs text-slate-500">
+                                {getFormulaOperatorLabel(field.formula.operator)} of {field.formula.operandLabels.join(', ')}
+                              </p>
+                            ) : null}
                             {field.type === 'textarea' ? (
                               <textarea
                                 value={value}
                                 rows={4}
                                 onChange={(e) => handleFieldValueChange(field.label, e.target.value)}
                                 className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                                {...getFieldValidationProps(field)}
                               />
                             ) : field.type === 'checkbox' ? (
                               getFieldOptions(field).length ? (
@@ -861,12 +1196,21 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
                                   <option key={option} value={option}>{option}</option>
                                 ))}
                               </select>
+                            ) : field.type === 'formula' ? (
+                              <input
+                                type="text"
+                                readOnly
+                                value={value}
+                                placeholder="Auto-calculated"
+                                className="w-full rounded-2xl border border-slate-300 bg-slate-100 px-3 py-2 text-sm text-slate-700"
+                              />
                             ) : (
                               <input
                                 type={field.type}
                                 value={value}
                                 onChange={(e) => handleFieldValueChange(field.label, e.target.value)}
                                 className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                                {...getFieldValidationProps(field)}
                               />
                             )}
                           </div>
@@ -894,6 +1238,11 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
                         <label className="block text-xs sm:text-sm font-medium text-slate-700">
                           {field.label}{field.required ? ' *' : ''}
                         </label>
+                        {field.type === 'formula' && field.formula ? (
+                          <p className="text-xs text-slate-500">
+                            {getFormulaOperatorLabel(field.formula.operator)} of {field.formula.operandLabels.join(', ')}
+                          </p>
+                        ) : null}
                         {field.type === 'textarea' ? (
                           <textarea
                             value={value}
@@ -901,6 +1250,7 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
                             rows={4}
                             onChange={(e) => handleFieldValueChange(field.label, e.target.value)}
                             className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                            {...getFieldValidationProps(field)}
                           />
                         ) : field.type === 'checkbox' ? (
                           getFieldOptions(field).length ? (
@@ -939,6 +1289,14 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
                               <option key={option} value={option}>{option}</option>
                             ))}
                           </select>
+                        ) : field.type === 'formula' ? (
+                          <input
+                            type="text"
+                            readOnly
+                            value={value}
+                            placeholder="Auto-calculated"
+                            className="w-full rounded-2xl border border-slate-300 bg-slate-100 px-3 py-2 text-sm text-slate-700"
+                          />
                         ) : (
                           <input
                             type={field.type}
@@ -946,6 +1304,7 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
                             disabled={readOnly}
                             onChange={(e) => handleFieldValueChange(field.label, e.target.value)}
                             className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                            {...getFieldValidationProps(field)}
                           />
                         )}
                       </div>
@@ -975,47 +1334,59 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
         <section className="rounded-3xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm">
           <h2 className="text-lg sm:text-xl font-semibold">Pending Review</h2>
           {reviewableSubmissions.length ? (
-            <div className="mt-5 space-y-4">
-              {reviewableSubmissions.map((submission) => (
-                <div key={submission._id} className="rounded-3xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
-                  <div className="flex flex-col gap-2">
-                    <div>
-                      <p className="font-semibold text-slate-900 text-sm sm:text-base">{submission.templateName}</p>
-                      <p className="text-xs sm:text-sm text-slate-600 mt-1">Submitted by: {submission.submittedBy}</p>
-                      <p className="text-xs sm:text-sm text-slate-600">Submitted: {new Date(submission.createdAt).toLocaleString()}</p>
-                      <p className="text-xs sm:text-sm text-slate-500">Updated: {new Date(submission.updatedAt).toLocaleString()}</p>
-                    </div>
-                  </div>
-                  <div className="mt-4 rounded-3xl border border-slate-200 bg-white p-3 sm:p-4 overflow-x-auto">
-                    <pre className="whitespace-pre-wrap break-words text-xs sm:text-sm text-slate-800">{JSON.stringify(submission.data, null, 2)}</pre>
-                  </div>
-                  <div className="mt-4 space-y-3">
-                    <label className="block text-sm font-medium text-slate-700">Review Comments</label>
-                    <textarea
-                      rows={3}
-                      value={reviewComments[submission._id] ?? ''}
-                      onChange={(e) => setReviewComments((current) => ({ ...current, [submission._id]: e.target.value }))}
-                      className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm"
-                    />
-                    <div className="flex flex-col sm:flex-row flex-wrap gap-3">
-                      <button
-                        type="button"
-                        onClick={() => reviewSubmission(submission._id, 'approve')}
-                        className="flex-1 sm:flex-none rounded-2xl bg-emerald-600 px-4 py-2.5 sm:py-2 text-xs sm:text-sm font-semibold text-white hover:bg-emerald-700 transition"
-                      >
-                        Approve
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => reviewSubmission(submission._id, 'reject')}
-                        className="flex-1 sm:flex-none rounded-2xl bg-rose-600 px-4 py-2.5 sm:py-2 text-xs sm:text-sm font-semibold text-white hover:bg-rose-700 transition"
-                      >
-                        Reject
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
+            <div className="mt-5 overflow-x-auto rounded-2xl border border-slate-200">
+              <table className="w-full min-w-[960px] border-collapse text-left text-sm text-slate-700">
+                <thead className="bg-slate-100 text-slate-600">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">Form Name</th>
+                    <th className="px-4 py-3 font-semibold">Submitted By</th>
+                    <th className="px-4 py-3 font-semibold">Submitted</th>
+                    <th className="px-4 py-3 font-semibold">Updated</th>
+                    <th className="px-4 py-3 font-semibold">Form Data</th>
+                    <th className="px-4 py-3 font-semibold">Review</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reviewableSubmissions.map((submission) => (
+                    <tr key={submission._id} className="border-t border-slate-200 align-top bg-white">
+                      <td className="px-4 py-4 font-medium text-slate-900">{submission.templateName}</td>
+                      <td className="px-4 py-4">{submission.submittedBy}</td>
+                      <td className="px-4 py-4 whitespace-nowrap">{new Date(submission.createdAt).toLocaleString()}</td>
+                      <td className="px-4 py-4 whitespace-nowrap">{new Date(submission.updatedAt).toLocaleString()}</td>
+                      <td className="px-4 py-4">
+                        <SubmissionDataTable data={submission.data} />
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="min-w-[220px] space-y-3">
+                          <label className="block text-sm font-medium text-slate-700">Review Comments</label>
+                          <textarea
+                            rows={3}
+                            value={reviewComments[submission._id] ?? ''}
+                            onChange={(e) => setReviewComments((current) => ({ ...current, [submission._id]: e.target.value }))}
+                            className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm"
+                          />
+                          <div className="flex flex-col gap-2">
+                            <button
+                              type="button"
+                              onClick={() => reviewSubmission(submission._id, 'approve')}
+                              className="rounded-2xl bg-emerald-600 px-4 py-2 text-xs sm:text-sm font-semibold text-white hover:bg-emerald-700 transition"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => reviewSubmission(submission._id, 'reject')}
+                              className="rounded-2xl bg-rose-600 px-4 py-2 text-xs sm:text-sm font-semibold text-white hover:bg-rose-700 transition"
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           ) : (
             <p className="mt-4 text-sm text-slate-500">No submissions pending review.</p>
@@ -1026,21 +1397,35 @@ export default function FormsDashboard({ userRole, userId, userName }: FormsDash
       <section className="rounded-3xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm">
         <h2 className="text-lg sm:text-xl font-semibold">Approved Form Data</h2>
         {approvedSubmissions.length ? (
-          <div className="mt-5 space-y-4">
-            {approvedSubmissions.map((submission) => (
-              <div key={submission._id} className="rounded-3xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
-                <p className="font-semibold text-slate-900 text-sm sm:text-base">{submission.templateName}</p>
-                <p className="text-xs sm:text-sm text-slate-600 mt-1">Submitted by: {submission.submittedBy}</p>
-                <p className="text-xs sm:text-sm text-slate-600">Submitted: {new Date(submission.createdAt).toLocaleString()}</p>
-                <p className="text-xs sm:text-sm text-slate-500">Approved: {new Date(submission.approvedAt ?? submission.updatedAt).toLocaleString()}</p>
-                {submission.approvedBy ? (
-                  <p className="text-xs sm:text-sm text-slate-500">Approved by: {submission.approvedBy}</p>
-                ) : null}
-                <div className="mt-3 rounded-2xl bg-white p-3 sm:p-4 text-xs sm:text-sm text-slate-800 overflow-x-auto">
-                  <pre className="whitespace-pre-wrap break-words text-xs">{JSON.stringify(submission.data, null, 2)}</pre>
-                </div>
-              </div>
-            ))}
+          <div className="mt-5 overflow-x-auto rounded-2xl border border-slate-200">
+            <table className="w-full min-w-[960px] border-collapse text-left text-sm text-slate-700">
+              <thead className="bg-slate-100 text-slate-600">
+                <tr>
+                  <th className="px-4 py-3 font-semibold">Form Name</th>
+                  <th className="px-4 py-3 font-semibold">Submitted By</th>
+                  <th className="px-4 py-3 font-semibold">Submitted</th>
+                  <th className="px-4 py-3 font-semibold">Approved</th>
+                  <th className="px-4 py-3 font-semibold">Approved By</th>
+                  <th className="px-4 py-3 font-semibold">Form Data</th>
+                </tr>
+              </thead>
+              <tbody>
+                {approvedSubmissions.map((submission) => (
+                  <tr key={submission._id} className="border-t border-slate-200 align-top bg-white">
+                    <td className="px-4 py-4 font-medium text-slate-900">{submission.templateName}</td>
+                    <td className="px-4 py-4">{submission.submittedBy}</td>
+                    <td className="px-4 py-4 whitespace-nowrap">{new Date(submission.createdAt).toLocaleString()}</td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      {new Date(submission.approvedAt ?? submission.updatedAt).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-4">{submission.approvedBy || '—'}</td>
+                    <td className="px-4 py-4">
+                      <SubmissionDataTable data={submission.data} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : (
           <p className="mt-4 text-sm text-slate-500">No approved forms have been published yet.</p>
