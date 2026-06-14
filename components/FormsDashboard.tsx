@@ -27,6 +27,7 @@ interface FormTemplate {
   fields: FormField[];
   assignedRoles: string[];
   approvalRoles: string[];
+  assignedBranches?: string[]; // Branch codes that can access this form
   status?: string;
   submissionType?: 'one-time' | 'recurring';
   frequency?: 'daily' | 'weekly' | 'fortnightly' | 'monthly';
@@ -71,6 +72,7 @@ const emptyTemplate: FormTemplate = {
   fields: [],
   assignedRoles: ['PACS'],
   approvalRoles: ['Supervisor'],
+  assignedBranches: [], // Empty means all branches
   submissionType: 'one-time',
   frequency: 'daily',
   dueDate: '',
@@ -156,10 +158,22 @@ export default function FormsDashboard({ userRole, userId, userName, branchCode 
   const [statusMessage, setStatusMessage] = useState<string>('');
   const [reviewComments, setReviewComments] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [branches, setBranches] = useState<Array<{ branchCode: string; branchName: string }>>([]);
 
   const assignedTemplates = useMemo(
-    () => templates.filter((template) => template.assignedRoles?.includes(userRole)),
-    [templates, userRole]
+    () => {
+      return templates.filter((template) => {
+        // Check role assignment
+        if (!template.assignedRoles?.includes(userRole)) return false;
+        
+        // Check branch assignment (empty array or undefined means all branches)
+        if (!template.assignedBranches || template.assignedBranches.length === 0) return true;
+        
+        // Check if user's branch is in assigned branches
+        return template.assignedBranches.includes(branchCode);
+      });
+    },
+    [templates, userRole, branchCode]
   );
 
   const mySubmissions = useMemo(
@@ -217,6 +231,7 @@ export default function FormsDashboard({ userRole, userId, userName, branchCode 
     loadTemplates();
     loadSubmissions();
     loadApprovedSubmissions();
+    loadBranches();
   }, []);
 
   useEffect(() => {
@@ -237,6 +252,14 @@ export default function FormsDashboard({ userRole, userId, userName, branchCode 
       }
     }
   }, [activeTemplateId, templates, mySubmissions, assignedTemplates]);
+
+  const loadBranches = async () => {
+    const response = await fetch('/api/branches');
+    const payload = await response.json();
+    if (payload.success) {
+      setBranches(payload.branches || []);
+    }
+  };
 
   const loadTemplates = async () => {
     const response = await fetch('/api/forms/templates');
@@ -337,6 +360,15 @@ export default function FormsDashboard({ userRole, userId, userName, branchCode 
         ? Array.from(new Set([...current.approvalRoles, role]))
         : current.approvalRoles.filter((item) => item !== role);
       return { ...current, approvalRoles };
+    });
+  };
+
+  const updateAssignedBranch = (branchCode: string, checked: boolean) => {
+    setSelectedTemplate((current) => {
+      const assignedBranches = checked
+        ? Array.from(new Set([...(current.assignedBranches || []), branchCode]))
+        : (current.assignedBranches || []).filter((item) => item !== branchCode);
+      return { ...current, assignedBranches };
     });
   };
 
@@ -634,6 +666,23 @@ export default function FormsDashboard({ userRole, userId, userName, branchCode 
                         className="h-4 w-4 rounded border-slate-300 text-cyan-600 cursor-pointer"
                       />
                       {role}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
+                <p className="mb-3 text-sm font-medium text-slate-700">Assign to Branches (Optional)</p>
+                <p className="mb-3 text-xs text-slate-500">Leave all unchecked to assign to all branches</p>
+                <div className="grid gap-2 sm:grid-cols-2 max-h-48 overflow-y-auto">
+                  {branches.map((branch) => (
+                    <label key={branch.branchCode} className="inline-flex items-center gap-2 text-sm text-slate-800">
+                      <input
+                        type="checkbox"
+                        checked={(selectedTemplate.assignedBranches || []).includes(branch.branchCode)}
+                        onChange={(e) => updateAssignedBranch(branch.branchCode, e.target.checked)}
+                        className="h-4 w-4 rounded border-slate-300 text-cyan-600 cursor-pointer"
+                      />
+                      {branch.branchCode} - {branch.branchName}
                     </label>
                   ))}
                 </div>
@@ -1063,6 +1112,39 @@ export default function FormsDashboard({ userRole, userId, userName, branchCode 
                         <p className="text-sm font-medium text-slate-700">Approval Roles</p>
                         <p className="mt-1 text-slate-900 text-sm break-words">{lockedTemplate.approvalRoles.join(', ')}</p>
                       </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-700">Assigned to Branches</p>
+                        <p className="mt-1 text-slate-900 text-sm break-words">
+                          {lockedTemplate.assignedBranches && lockedTemplate.assignedBranches.length > 0
+                            ? lockedTemplate.assignedBranches.map(code => {
+                                const branch = branches.find(b => b.branchCode === code);
+                                return branch ? `${branch.branchCode} - ${branch.branchName}` : code;
+                              }).join(', ')
+                            : 'All Branches'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-700">Submission Type</p>
+                        <p className="mt-1 text-slate-900 text-sm">{lockedTemplate.submissionType || 'one-time'}</p>
+                      </div>
+                      {lockedTemplate.submissionType === 'recurring' && (
+                        <div>
+                          <p className="text-sm font-medium text-slate-700">Frequency</p>
+                          <p className="mt-1 text-slate-900 text-sm">{lockedTemplate.frequency || 'daily'}</p>
+                        </div>
+                      )}
+                      {lockedTemplate.dueDate && (
+                        <div>
+                          <p className="text-sm font-medium text-slate-700">Due Date</p>
+                          <p className="mt-1 text-slate-900 text-sm">{new Date(lockedTemplate.dueDate).toLocaleString()}</p>
+                        </div>
+                      )}
+                      {lockedTemplate.secondApprovalRole && (
+                        <div>
+                          <p className="text-sm font-medium text-slate-700">2nd Approval Role</p>
+                          <p className="mt-1 text-slate-900 text-sm">{lockedTemplate.secondApprovalRole}</p>
+                        </div>
+                      )}
                     </div>
                   </div>
 
