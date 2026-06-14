@@ -372,25 +372,34 @@ export default function FormsDashboard({ userRole, userId, userName, branchCode 
     });
   };
 
-  const getTemplateForSave = () => ({
-    ...selectedTemplate,
-    fields: selectedTemplate.fields.map((field) => ({
-      ...field,
-      required: field.type === 'formula' ? false : isRequiredValue(field.required),
-      options: optionFieldTypes.includes(field.type)
-        ? cleanOptions(field.options)
-        : [],
-      ...(field.type === 'formula' && field.formula
-        ? {
-            formula: {
-              operator: field.formula.operator,
-              operandLabels: field.formula.operandLabels,
-            },
-          }
-        : {}),
-      ...(field.validation ? { validation: field.validation } : {}),
-    })),
-  });
+  const getTemplateForSave = () => {
+    // Ensure second approver role is in approval roles
+    let approvalRoles = [...selectedTemplate.approvalRoles];
+    if (selectedTemplate.secondApprovalRole && !approvalRoles.includes(selectedTemplate.secondApprovalRole)) {
+      approvalRoles.push(selectedTemplate.secondApprovalRole);
+    }
+    
+    return {
+      ...selectedTemplate,
+      approvalRoles,
+      fields: selectedTemplate.fields.map((field) => ({
+        ...field,
+        required: field.type === 'formula' ? false : isRequiredValue(field.required),
+        options: optionFieldTypes.includes(field.type)
+          ? cleanOptions(field.options)
+          : [],
+        ...(field.type === 'formula' && field.formula
+          ? {
+              formula: {
+                operator: field.formula.operator,
+                operandLabels: field.formula.operandLabels,
+              },
+            }
+          : {}),
+        ...(field.validation ? { validation: field.validation } : {}),
+      })),
+    };
+  };
 
   const saveTemplate = async () => {
     clearStatus();
