@@ -1,6 +1,9 @@
+// Server-only functions that require MongoDB
 import { getUsersCollection } from './mongodb';
+import { normalizeBranchCode, isBranchScopedRole } from './branchAccessUtils';
 
-export const normalizeBranchCode = (value: unknown) => String(value ?? '').trim();
+// Re-export client-safe utilities for backward compatibility
+export { normalizeBranchCode, isBranchScopedRole, canAccessSubmissionByBranch, isSameBranch } from './branchAccessUtils';
 
 export async function getUserBranchCode(userId: string | undefined | null) {
   if (!userId) return '';
@@ -8,21 +11,6 @@ export async function getUserBranchCode(userId: string | undefined | null) {
   const users = await getUsersCollection();
   const user = await users.findOne({ userId }, { projection: { branch_code: 1 } });
   return normalizeBranchCode(user?.branch_code);
-}
-
-export function isBranchScopedRole(role: string) {
-  return role === 'Manager' || role === 'Supervisor';
-}
-
-export function canAccessSubmissionByBranch(
-  viewerRole: string,
-  viewerBranchCode: string,
-  submissionBranchCode: string
-) {
-  if (viewerRole === 'Admin') return true;
-  if (!isBranchScopedRole(viewerRole)) return true;
-  if (!viewerBranchCode || !submissionBranchCode) return false;
-  return viewerBranchCode === submissionBranchCode;
 }
 
 export type SubmissionBranchSource = Record<string, unknown> & {
