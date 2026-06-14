@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth/next';
 import { redirect } from 'next/navigation';
 import AppShell from '../../components/AppShell';
 import SettingsPanel from '../../components/SettingsPanel';
+import OrganizationSettings from '../../components/OrganizationSettings';
 import { authOptions } from '../../lib/auth';
 import { getMenusCollection, getUsersCollection, serializeMenuItems } from '../../lib/mongodb';
 
@@ -24,6 +25,8 @@ export default async function SettingsPage() {
   const currentMobile = currentUser?.mobile ?? '';
   const currentImage = currentUser?.image ?? userImage;
 
+  const isAdmin = userRole === 'Admin';
+
   return (
     <AppShell
       userName={userName}
@@ -33,7 +36,10 @@ export default async function SettingsPage() {
       description="Application preferences, roles, and menu configuration."
       menuItems={menuItems}
     >
-      <SettingsPanel userId={userId} currentMobile={currentMobile} currentImage={currentImage} />
+      <div className="space-y-6">
+        <SettingsPanel userId={userId} currentMobile={currentMobile} currentImage={currentImage} />
+        {isAdmin && <OrganizationSettings />}
+      </div>
     </AppShell>
   );
 }

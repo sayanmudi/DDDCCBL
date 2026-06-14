@@ -1,6 +1,6 @@
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { NextAuthOptions } from 'next-auth';
-import { getUsersCollection } from './mongodb';
+import { getUsersCollection, getOrganizationSettingsCollection } from './mongodb';
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -33,10 +33,11 @@ export const authOptions: NextAuthOptions = {
     })
   ],
   session: {
-    strategy: 'jwt'
+    strategy: 'jwt',
+    maxAge: 15 * 60, // Default 15 minutes in seconds
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.role = (user as any).role;
         if ((user as any).image) {
@@ -48,7 +49,28 @@ export const authOptions: NextAuthOptions = {
         if ((user as any).branch_code !== undefined) {
           token.branch_code = (user as any).branch_code;
         }
+        // Set initial login time
+        token.loginTime = Date.now();
       }
+      
+      // Check session timeout on every request
+      if (token.loginTime) {
+        try {
+          const settingsCollection = await getOrganizationSettingsCollection();
+          const settings = await settingsCollection.findOne({ settingId: 'global' });
+          const timeoutMinutes = settings?.sessionTimeoutMinutes || 15;
+          const timeoutMs = timeoutMinutes * 60 * 1000;
+          const currentTime = Date.now();
+          
+          // If session has expired, return null to force logout
+          if (currentTime - (token.loginTime as number) > timeoutMs) {
+            return null as any;
+          }
+        } catch (error) {
+          console.error('Error checking session timeout:', error);
+        }
+      }
+      
       return token;
     },
     async session({ session, token }) {

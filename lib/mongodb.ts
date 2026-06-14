@@ -50,4 +50,8 @@ export async function getFormSubmissionsCollection() {
   return db.collection('form_submissions');
 }
 
+export async function getOrganizationSettingsCollection() {
+  const db = await connectToDatabase();
+  return db.collection('organization_settings');
+}
 
