@@ -25,15 +25,20 @@ export function canAccessSubmissionByBranch(
   return viewerBranchCode === submissionBranchCode;
 }
 
-export async function resolveSubmissionBranchCode(
-  submission: { branch_code?: unknown; submittedById?: string | null }
-) {
+export type SubmissionBranchSource = Record<string, unknown> & {
+  branch_code?: unknown;
+  submittedById?: string | null;
+};
+
+export async function resolveSubmissionBranchCode(submission: SubmissionBranchSource) {
   const storedBranchCode = normalizeBranchCode(submission.branch_code);
   if (storedBranchCode) return storedBranchCode;
-  return getUserBranchCode(submission.submittedById);
+  return getUserBranchCode(
+    typeof submission.submittedById === 'string' ? submission.submittedById : null
+  );
 }
 
-export async function filterSubmissionsByBranch<T extends { branch_code?: unknown; submittedById?: string | null }>(
+export async function filterSubmissionsByBranch<T extends SubmissionBranchSource>(
   submissions: T[],
   viewerRole: string,
   viewerBranchCode: string
