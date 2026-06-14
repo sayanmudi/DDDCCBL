@@ -4,6 +4,7 @@ import AppShell from '../../../components/AppShell';
 import { authOptions } from '../../../lib/auth';
 import { getMenusCollection, serializeMenuItems } from '../../../lib/mongodb';
 import { normalizeBranchCode } from '../../../lib/branchAccess';
+import { getBranchName } from '../../../lib/branches';
 
 const sampleTellerData = [
   { teller: 'Teller A', transactions: 94, cashIn: 82000, cashOut: 76000 },
@@ -24,12 +25,14 @@ export default async function TellerReportsPage() {
   const userBranchCode = normalizeBranchCode((session.user as any).branch_code);
   const menus = await getMenusCollection();
   const menuItems = serializeMenuItems((await menus.find({}).toArray()) as any[]);
+  const userBranchName = await getBranchName(userBranchCode);
 
   return (
     <AppShell
       userName={userName}
       userRole={userRole}
       userBranchCode={userBranchCode}
+      userBranchName={userBranchName}
       userImage={userImage}
       title="Teller Reports"
       description="Teller transaction summary and performance sample data."

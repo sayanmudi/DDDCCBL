@@ -5,6 +5,7 @@ import { authOptions } from '../../../lib/auth';
 import { hasAccess } from '../../../lib/permissions';
 import { getMenusCollection, serializeMenuItems } from '../../../lib/mongodb';
 import { normalizeBranchCode } from '../../../lib/branchAccess';
+import { getBranchName } from '../../../lib/branches';
 
 interface ReportPageProps {
   params: { report: string };
@@ -25,6 +26,7 @@ export default async function ReportDetailPage({ params }: ReportPageProps) {
   const menuItems = serializeMenuItems((await menus.find({}).toArray()) as any[]);
   const reportsMenu = menuItems.find((menu: any) => menu.slug === 'reports');
   const report = reportsMenu?.subMenus?.find((item: any) => item.slug === reportSlug);
+  const userBranchName = await getBranchName(userBranchCode);
 
   if (!report) {
     return (
@@ -32,6 +34,7 @@ export default async function ReportDetailPage({ params }: ReportPageProps) {
         userName={userName}
         userRole={userRole}
         userBranchCode={userBranchCode}
+        userBranchName={userBranchName}
         userImage={userImage}
         title="Reports"
         description="Report not found."
@@ -53,6 +56,7 @@ export default async function ReportDetailPage({ params }: ReportPageProps) {
         userName={userName}
         userRole={userRole}
         userBranchCode={userBranchCode}
+        userBranchName={userBranchName}
         userImage={userImage}
         title="Access denied"
         description="You do not have permission to view this report."
@@ -71,6 +75,7 @@ export default async function ReportDetailPage({ params }: ReportPageProps) {
       userName={userName}
       userRole={userRole}
       userBranchCode={userBranchCode}
+      userBranchName={userBranchName}
       userImage={userImage}
       title={report.title}
       description={`Accessible by ${report.access.join(', ')}`}

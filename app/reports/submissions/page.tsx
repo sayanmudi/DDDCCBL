@@ -5,6 +5,7 @@ import SubmissionsReport from '../../../components/SubmissionsReport';
 import { authOptions } from '../../../lib/auth';
 import { getMenusCollection, serializeMenuItems } from '../../../lib/mongodb';
 import { normalizeBranchCode } from '../../../lib/branchAccess';
+import { getBranchName } from '../../../lib/branches';
 
 export default async function FormSubmissionsReportPage() {
   const session = await getServerSession(authOptions);
@@ -18,12 +19,14 @@ export default async function FormSubmissionsReportPage() {
   const userBranchCode = normalizeBranchCode((session.user as any).branch_code);
   const menus = await getMenusCollection();
   const menuItems = serializeMenuItems((await menus.find({}).toArray()) as any[]);
+  const userBranchName = await getBranchName(userBranchCode);
 
   return (
     <AppShell
       userName={userName}
       userRole={userRole}
       userBranchCode={userBranchCode}
+      userBranchName={userBranchName}
       userImage={userImage}
       title="Form Submissions"
       description="Browse submitted forms and apply filters by user, status, and dates."

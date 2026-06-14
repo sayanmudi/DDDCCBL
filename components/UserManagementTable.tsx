@@ -14,11 +14,17 @@ interface UserRow {
   isActive?: boolean;
 }
 
+interface Branch {
+  branchCode: string;
+  branchName: string;
+}
+
 interface UserManagementTableProps {
   users: UserRow[];
   currentUserId: string;
   currentUserRole: string;
   currentUserBranchCode: string;
+  branches: Branch[];
 }
 
 const roleOptions = ['Admin', 'Manager', 'Supervisor', 'Teller', 'PACS'];
@@ -28,6 +34,7 @@ export default function UserManagementTable({
   currentUserId,
   currentUserRole,
   currentUserBranchCode,
+  branches,
 }: UserManagementTableProps) {
   const [userList, setUserList] = useState<UserRow[]>(users);
   const [selectedRoles, setSelectedRoles] = useState<Record<string, string>>(
@@ -172,8 +179,7 @@ export default function UserManagementTable({
                   <td className="px-6 py-4">
                     {canEditBranch ? (
                       <div className="flex items-center gap-3">
-                        <input
-                          type="text"
+                        <select
                           value={selectedBranchCodes[user.userId] ?? user.branch_code}
                           onChange={(event) =>
                             setSelectedBranchCodes((prev) => ({
@@ -181,9 +187,16 @@ export default function UserManagementTable({
                               [user.userId]: event.target.value,
                             }))
                           }
-                          className="w-24 rounded-2xl border border-slate-800 bg-slate-950 px-3 py-2 text-slate-100 outline-none"
+                          className="rounded-2xl border border-slate-800 bg-slate-950 px-3 py-2 text-slate-100 outline-none"
                           disabled={loadingUserId === user.userId}
-                        />
+                        >
+                          <option value="" className="bg-slate-900 text-slate-100">Select Branch</option>
+                          {branches.map((branch) => (
+                            <option key={branch.branchCode} value={branch.branchCode} className="bg-slate-900 text-slate-100">
+                              {branch.branchCode} - {branch.branchName}
+                            </option>
+                          ))}
+                        </select>
                         <button
                           type="button"
                           onClick={() =>
@@ -201,7 +214,9 @@ export default function UserManagementTable({
                         </button>
                       </div>
                     ) : (
-                      user.branch_code || '—'
+                      <>
+                        {branches.find(b => b.branchCode === user.branch_code)?.branchName || user.branch_code || '—'}
+                      </>
                     )}
                   </td>
                   <td className="px-6 py-4">

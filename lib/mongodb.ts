@@ -55,3 +55,8 @@ export async function getOrganizationSettingsCollection() {
   return db.collection('organization_settings');
 }
 
+export async function getBranchesCollection() {
+  const db = await connectToDatabase();
+  return db.collection('branches');
+}
+

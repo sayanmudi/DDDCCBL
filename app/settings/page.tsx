@@ -7,6 +7,7 @@ import { authOptions } from '../../lib/auth';
 import { getMenusCollection, getUsersCollection, serializeMenuItems } from '../../lib/mongodb';
 import { normalizeBranchCode } from '../../lib/branchAccess';
 import { getOrganizationSettings } from '../../lib/organizationSettings';
+import { getBranchName } from '../../lib/branches';
 
 export default async function SettingsPage() {
   const session = await getServerSession(authOptions);
@@ -30,12 +31,16 @@ export default async function SettingsPage() {
   const currentImage = currentUser?.image ?? userImage;
 
   const isAdmin = userRole === 'Admin';
+  
+  // Get branch name for current user
+  const userBranchName = await getBranchName(userBranchCode);
 
   return (
     <AppShell
       userName={userName}
       userRole={userRole}
       userBranchCode={userBranchCode}
+      userBranchName={userBranchName}
       userImage={userImage}
       title="Settings"
       description="Application preferences, roles, and menu configuration."

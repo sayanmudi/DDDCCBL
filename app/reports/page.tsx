@@ -6,6 +6,7 @@ import { authOptions } from '../../lib/auth';
 import { getAccessibleSubMenus, hasAccess } from '../../lib/permissions';
 import { getMenusCollection, serializeMenuItems } from '../../lib/mongodb';
 import { normalizeBranchCode } from '../../lib/branchAccess';
+import { getBranchName } from '../../lib/branches';
 
 export default async function ReportsPage() {
   const session = await getServerSession(authOptions);
@@ -20,6 +21,7 @@ export default async function ReportsPage() {
   const menus = await getMenusCollection();
   const menuItems = serializeMenuItems((await menus.find({}).toArray()) as any[]);
   const reportsMenu = menuItems.find((menu: any) => menu.slug === 'reports');
+  const userBranchName = await getBranchName(userBranchCode);
 
   const availableReports = reportsMenu?.subMenus?.filter((item: any) => hasAccess(userRole, item.access)) ?? [];
 
@@ -28,6 +30,7 @@ export default async function ReportsPage() {
       userName={userName}
       userRole={userRole}
       userBranchCode={userBranchCode}
+      userBranchName={userBranchName}
       userImage={userImage}
       title="Reports"
       description="Choose the correct report for your role."

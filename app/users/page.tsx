@@ -6,6 +6,7 @@ import { authOptions } from '../../lib/auth';
 import { getUserBranchCode, normalizeBranchCode } from '../../lib/branchAccess';
 import { getMenusCollection, getUsersCollection, serializeMenuItems } from '../../lib/mongodb';
 import { getOrganizationSettings } from '../../lib/organizationSettings';
+import { getBranchName, getAllBranches } from '../../lib/branches';
 
 type PageUserRow = {
   userId: string;
@@ -34,6 +35,12 @@ export default async function UsersPage() {
   const menuItems = serializeMenuItems((await menus.find({}).toArray()) as Record<string, unknown>[]);
   const { organizationName, logoPath } = await getOrganizationSettings();
   const usersCollection = await getUsersCollection();
+  
+  // Get branch name for current user
+  const userBranchName = await getBranchName(viewerBranchCode);
+  
+  // Get all branches for dropdown
+  const branches = await getAllBranches();
 
   let userFilter: Record<string, unknown> = {};
   if (userRole === 'Manager') {
@@ -59,6 +66,7 @@ export default async function UsersPage() {
       userName={userName}
       userRole={userRole}
       userBranchCode={viewerBranchCode}
+      userBranchName={userBranchName}
       organizationName={organizationName}
       logoPath={logoPath}
       userImage={userImage}
@@ -82,6 +90,7 @@ export default async function UsersPage() {
         currentUserId={currentUserId}
         currentUserRole={userRole}
         currentUserBranchCode={viewerBranchCode}
+        branches={branches}
       />
     </AppShell>
   );

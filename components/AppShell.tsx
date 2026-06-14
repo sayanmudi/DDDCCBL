@@ -24,6 +24,7 @@ interface AppShellProps {
   userName: string;
   userRole: string;
   userBranchCode?: string;
+  userBranchName?: string;
   userImage?: string;
   title: string;
   description: string;
@@ -33,7 +34,7 @@ interface AppShellProps {
   children: React.ReactNode;
 }
 
-export default function AppShell({ userName, userRole, userBranchCode, userImage, title, description, menuItems, organizationName = 'Dakshin Dinajpur District Central Co-operative Bank Ltd.', logoPath = '/photos/dddccb_logo.png', children }: AppShellProps) {
+export default function AppShell({ userName, userRole, userBranchCode, userBranchName, userImage, title, description, menuItems, organizationName = 'Dakshin Dinajpur District Central Co-operative Bank Ltd.', logoPath = '/photos/dddccb_logo.png', children }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const popupRef = useRef<HTMLDivElement | null>(null);
@@ -107,7 +108,7 @@ export default function AppShell({ userName, userRole, userBranchCode, userImage
                   <p className="text-xs uppercase tracking-[0.3em] text-cyan-600">Welcome</p>
                   <p className="text-sm font-semibold">{userName}</p>
                   <p className="text-xs text-slate-500">
-                    {userRole}{userBranchCode ? ` • Branch ${userBranchCode}` : ''}
+                    {userRole}{userBranchName ? ` • ${userBranchName}` : ''}
                   </p>
                 </div>
               </button>

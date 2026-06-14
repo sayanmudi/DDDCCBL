@@ -6,6 +6,7 @@ import { authOptions } from '../../lib/auth';
 import { getMenusCollection, serializeMenuItems } from '../../lib/mongodb';
 import { normalizeBranchCode } from '../../lib/branchAccess';
 import { getOrganizationSettings } from '../../lib/organizationSettings';
+import { getBranchName } from '../../lib/branches';
 
 export default async function FormsPage() {
   const session = await getServerSession(authOptions);
@@ -22,6 +23,7 @@ export default async function FormsPage() {
   const menus = await getMenusCollection();
   const menuItems = serializeMenuItems((await menus.find({}).toArray()) as any[]);
   const { organizationName, logoPath } = await getOrganizationSettings();
+  const userBranchName = await getBranchName(userBranchCode);
 
   return (
     <AppShell
@@ -30,6 +32,7 @@ export default async function FormsPage() {
       userName={userName}
       userRole={userRole}
       userBranchCode={userBranchCode}
+      userBranchName={userBranchName}
       userImage={(session.user as any).image as string | undefined}
       title="Forms"
       description="Create, update, assign, and manage form workflows."
