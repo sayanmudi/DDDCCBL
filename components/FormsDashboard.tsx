@@ -32,6 +32,7 @@ interface FormTemplate {
   frequency?: 'daily' | 'weekly' | 'fortnightly' | 'monthly';
   dueDate?: string;
   secondApprovalRole?: string;
+  requiresTwoStageApproval?: boolean;
 }
 
 interface FormSubmission {
@@ -178,6 +179,23 @@ export default function FormsDashboard({ userRole, userId, userName, branchCode 
       ? Array.isArray(template.approvalRoles) && template.approvalRoles.includes(userRole)
       : false;
     if (!hasApprovalRole) return false;
+
+    // Check for two-stage approval
+    if (template?.requiresTwoStageApproval && template.secondApprovalRole) {
+      const hasFirstApproval = (submission as any).firstApprovedBy && (submission as any).firstApprovedAt;
+      
+      if (hasFirstApproval) {
+        // If first approval is done, only second approver can review
+        if (userRole !== template.secondApprovalRole && userRole !== 'Admin') {
+          return false;
+        }
+      } else {
+        // If first approval is not done, second approver should not see it
+        if (userRole === template.secondApprovalRole) {
+          return false;
+        }
+      }
+    }
 
     if (userRole === 'Manager' || userRole === 'Supervisor') {
       const submissionBranch = String(submission.branch_code ?? '').trim();

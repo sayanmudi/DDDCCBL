@@ -28,6 +28,12 @@ function serializeSubmission(submission: any) {
     approvedAt: submission.approvedAt?.toISOString?.() ?? submission.approvedAt ?? null,
     rejectedBy: submission.rejectedBy ?? null,
     rejectedAt: submission.rejectedAt?.toISOString?.() ?? submission.rejectedAt ?? null,
+    firstApprovedBy: submission.firstApprovedBy ?? null,
+    firstApprovedAt: submission.firstApprovedAt?.toISOString?.() ?? submission.firstApprovedAt ?? null,
+    firstApproverRole: submission.firstApproverRole ?? null,
+    secondApprovedBy: submission.secondApprovedBy ?? null,
+    secondApprovedAt: submission.secondApprovedAt?.toISOString?.() ?? submission.secondApprovedAt ?? null,
+    secondApproverRole: submission.secondApproverRole ?? null,
   };
 }
 
